@@ -1,0 +1,17 @@
+table = "payment_allocations"
+record = "The part of one payment that pays one invoice. The only link between payments and invoices."
+aliases = ["payment allocation", "allocation"]
+
+[columns.id]
+description = "Internal number of the allocation."
+
+[columns.payment_id]
+description = "The payment."
+link = "payments.id"
+
+[columns.supplier_invoice_id]
+description = "The invoice this part of the payment pays."
+link = "supplier_invoices.id"
+
+[columns.amount]
+description = "How much of the payment goes to this invoice, in US dollars."

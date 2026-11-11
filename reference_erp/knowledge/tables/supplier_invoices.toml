@@ -1,0 +1,61 @@
+table = "supplier_invoices"
+record = "One bill from a supplier. Most invoices are for a purchase order; freight and service invoices have none."
+aliases = ["invoice", "supplier invoice", "bill"]
+
+[columns.id]
+description = "Internal number of the invoice. Invoice lines and payment allocations link to it."
+
+[columns.document_number]
+description = "Our number for the invoice, unique across all suppliers. Not the id."
+aliases = ["document number"]
+
+[columns.invoice_number]
+description = "The supplier's own number for the invoice. Two suppliers can use the same one, so filter by supplier too."
+aliases = ["supplier invoice number"]
+
+[columns.supplier_id]
+description = "The supplier who sent the invoice."
+link = "suppliers.id"
+
+[columns.purchase_order_id]
+description = "The order the invoice is for. No foreign key. Empty for freight and service invoices."
+link = "purchase_orders.id"
+
+[columns.status]
+description = "Where the invoice is in review and payment."
+values = { submitted = "Submitted", under_review = "In Review", approved = "Approved", rejected = "Rejected", payment_scheduled = "Scheduled for Payment", paid = "Paid" }
+
+[columns.invoice_date]
+description = "The date on the invoice."
+
+[columns.due_date]
+description = "The date the invoice must be paid by."
+
+[columns.subtotal]
+description = "Sum of the invoice lines, before tax, in US dollars."
+
+[columns.tax_amount]
+description = "Tax on the invoice, in US dollars."
+aliases = ["tax"]
+
+[columns.total_amount]
+description = "Amount to pay: subtotal plus tax, in US dollars."
+aliases = ["invoice total", "invoice amount"]
+
+[columns.rejection_reason]
+description = "Why the invoice was rejected. Empty unless the status is rejected."
+
+[columns.submitted_by]
+description = "The supplier user who sent the invoice. A user id with no foreign key."
+link = "users.id"
+
+[columns.reviewed_by]
+description = "The staff member who approved or rejected the invoice. A user id with no foreign key."
+link = "users.id"
+aliases = ["reviewer"]
+
+[columns.reviewed_at]
+description = "When the invoice was approved or rejected. Empty until reviewed."
+
+[columns.created_at]
+description = "When the invoice record was created. Use invoice_date for business questions."

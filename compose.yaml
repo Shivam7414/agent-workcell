@@ -1,0 +1,53 @@
+# The local environment: the reference ERP database, and one-off tools to load it and install the data guard.
+# The answer server and the reference host application run with Python next to it (see README.md); Compose services
+# for them are planned.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: erp_owner
+      POSTGRES_PASSWORD: ${ERP_OWNER_PASSWORD:-erp_owner_dev}
+      POSTGRES_DB: erp
+    ports:
+      # Only this computer can reach it.
+      - "127.0.0.1:${ERP_DB_PORT:-54329}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp_owner -d erp"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-off: docker compose run --rm seed [--scale 10] [--reset]
+  seed:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    entrypoint: ["python", "-m", "reference_erp.seed"]
+    environment:
+      ERP_DATABASE_URL: postgresql://erp_owner:${ERP_OWNER_PASSWORD:-erp_owner_dev}@db:5432/erp
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["tools"]
+
+  # One-off: docker compose run --rm guard apply | doctor | plan
+  guard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    entrypoint: ["python", "-m", "agent_workcell.guard"]
+    environment:
+      ERP_DATABASE_URL: postgresql://erp_owner:${ERP_OWNER_PASSWORD:-erp_owner_dev}@db:5432/erp
+      WORKCELL_POLICY: reference_erp/policy.toml
+      WORKCELL_AGENT_PASSWORD: ${WORKCELL_AGENT_PASSWORD:-}
+      WORKCELL_BINDER_PASSWORD: ${WORKCELL_BINDER_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["tools"]
+
+volumes:
+  db-data:

@@ -1,0 +1,22 @@
+table = "goods_receipt_lines"
+record = "One line of a delivery: how much of one order line arrived, and how much was sent back."
+aliases = ["receipt line"]
+
+[columns.id]
+description = "Internal number of the receipt line."
+
+[columns.goods_receipt_id]
+description = "The receipt this line belongs to."
+link = "goods_receipts.id"
+
+[columns.purchase_order_line_id]
+description = "The order line that was delivered."
+link = "purchase_order_lines.id"
+
+[columns.quantity_received]
+description = "Everything that arrived, including units that were sent back."
+aliases = ["received quantity"]
+
+[columns.quantity_rejected]
+description = "Units that were sent back. Accepted quantity is quantity_received minus quantity_rejected."
+aliases = ["rejected quantity"]

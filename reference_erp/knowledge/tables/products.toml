@@ -1,0 +1,30 @@
+table = "products"
+record = "One product in the catalog that can be ordered from suppliers."
+aliases = ["product", "item", "catalog item"]
+
+[columns.id]
+description = "Internal number of the product. Other tables link to it."
+
+[columns.sku]
+description = "The product code people use, such as P-00012."
+aliases = ["product code"]
+
+[columns.name]
+description = "Name of the product."
+aliases = ["product name"]
+
+[columns.category]
+description = "Product group, such as Fasteners, Electrical or Safety."
+
+[columns.unit]
+description = "The unit the product is ordered in: box, each, drum or pack."
+aliases = ["unit of measure"]
+
+[columns.list_price]
+description = "Catalog price for one unit, in US dollars. The price on an order line can differ."
+
+[columns.is_active]
+description = "Whether the product can still be ordered."
+
+[columns.deleted_at]
+description = "When the product was deleted in the application. Empty for products that were not deleted."

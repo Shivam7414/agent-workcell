@@ -1,0 +1,156 @@
+{
+  "benchmark": "guard latency",
+  "date": "2026-11-11T07:30:54+00:00",
+  "commit": "none (no commit yet; run from an uncommitted working tree)",
+  "model": "none (no model is called)",
+  "seed": 42,
+  "scale": 300,
+  "cases": 5,
+  "purchase_orders": 900000,
+  "runs_per_query": 10,
+  "warmup_runs": 3,
+  "postgres": "17.11 (Debian 17.11-1.pgdg13+2)",
+  "python": "3.12.2",
+  "machine": "Windows 11, AMD64, 12 logical CPUs",
+  "policy_sha256": "9efbb8a7122b153209aa51ada2438f38c145c4316ae04c24942a9fa45057c582",
+  "note": "Database in Docker on the same machine. Times include the round trip from Python. Guarded buyer and supplier read fewer rows than unguarded, so compare them with care.",
+  "queries": {
+    "orders by status": "SELECT status, count(*) FROM purchase_orders GROUP BY status",
+    "order value by supplier, last 90 days": "SELECT o.supplier_id, sum(l.quantity * l.unit_price * (1 - COALESCE(l.discount_pct, 0) / 100)) FROM purchase_orders o JOIN purchase_order_lines l ON l.purchase_order_id = o.id WHERE o.order_date > DATE '2026-06-30' - 90 AND o.deleted_at IS NULL GROUP BY o.supplier_id",
+    "overdue approved invoices": "SELECT count(*), sum(total_amount) FROM supplier_invoices WHERE status = 'approved' AND due_date < DATE '2026-06-30'",
+    "paid per invoice, failed payments excluded": "SELECT i.document_number, sum(a.amount) FROM supplier_invoices i JOIN payment_allocations a ON a.supplier_invoice_id = i.id JOIN payments p ON p.id = a.payment_id AND p.status <> 'failed' GROUP BY i.document_number",
+    "one order by number": "SELECT * FROM purchase_orders WHERE po_number = '4500000001'"
+  },
+  "results": {
+    "orders by status": {
+      "unguarded": {
+        "median_ms": 143.26,
+        "p95_ms": 148.01,
+        "min_ms": 133.54,
+        "rows": 8
+      },
+      "guarded admin": {
+        "median_ms": 200.91,
+        "p95_ms": 218.4,
+        "min_ms": 196.59,
+        "rows": 8
+      },
+      "guarded buyer": {
+        "median_ms": 121.32,
+        "p95_ms": 148.96,
+        "min_ms": 115.28,
+        "rows": 8
+      },
+      "guarded supplier": {
+        "median_ms": 148.9,
+        "p95_ms": 167.59,
+        "min_ms": 131.64,
+        "rows": 4
+      }
+    },
+    "order value by supplier, last 90 days": {
+      "unguarded": {
+        "median_ms": 2436.74,
+        "p95_ms": 2600.41,
+        "min_ms": 2349.41,
+        "rows": 11953
+      },
+      "guarded admin": {
+        "median_ms": 2437.92,
+        "p95_ms": 2653.83,
+        "min_ms": 2350.87,
+        "rows": 11953
+      },
+      "guarded buyer": {
+        "median_ms": 1117.76,
+        "p95_ms": 1198.65,
+        "min_ms": 1036.0,
+        "rows": 40
+      },
+      "guarded supplier": {
+        "median_ms": 1162.95,
+        "p95_ms": 1196.65,
+        "min_ms": 1114.07,
+        "rows": 1
+      }
+    },
+    "overdue approved invoices": {
+      "unguarded": {
+        "median_ms": 33.85,
+        "p95_ms": 34.74,
+        "min_ms": 32.06,
+        "rows": 1
+      },
+      "guarded admin": {
+        "median_ms": 187.75,
+        "p95_ms": 220.64,
+        "min_ms": 172.0,
+        "rows": 1
+      },
+      "guarded buyer": {
+        "median_ms": 177.05,
+        "p95_ms": 188.67,
+        "min_ms": 172.98,
+        "rows": 1
+      },
+      "guarded supplier": {
+        "median_ms": 172.6,
+        "p95_ms": 211.83,
+        "min_ms": 143.29,
+        "rows": 1
+      }
+    },
+    "paid per invoice, failed payments excluded": {
+      "unguarded": {
+        "median_ms": 2974.62,
+        "p95_ms": 3216.92,
+        "min_ms": 2742.29,
+        "rows": 617019
+      },
+      "guarded admin": {
+        "median_ms": 3220.0,
+        "p95_ms": 3525.6,
+        "min_ms": 2885.71,
+        "rows": 617019
+      },
+      "guarded buyer": {
+        "median_ms": 792.43,
+        "p95_ms": 856.59,
+        "min_ms": 768.02,
+        "rows": 0
+      },
+      "guarded supplier": {
+        "median_ms": 894.86,
+        "p95_ms": 965.68,
+        "min_ms": 864.12,
+        "rows": 11684
+      }
+    },
+    "one order by number": {
+      "unguarded": {
+        "median_ms": 4.52,
+        "p95_ms": 4.9,
+        "min_ms": 4.13,
+        "rows": 1
+      },
+      "guarded admin": {
+        "median_ms": 6.21,
+        "p95_ms": 7.21,
+        "min_ms": 5.22,
+        "rows": 1
+      },
+      "guarded buyer": {
+        "median_ms": 6.08,
+        "p95_ms": 7.72,
+        "min_ms": 5.18,
+        "rows": 1
+      },
+      "guarded supplier": {
+        "median_ms": 8.88,
+        "p95_ms": 12.95,
+        "min_ms": 5.48,
+        "rows": 0
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Personal Claude Code files. The shared ones (CLAUDE.md, .claude/rules) are committed.
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Benchmark scratch output. Recorded runs that back a published number go in bench/results and are committed.
+bench/tmp/
+
+# Audit database and per-run working folders of a local answer server.
+.workcell/

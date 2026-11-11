@@ -1,0 +1,55 @@
+# Named calculations. Each carries SQL that `python -m agent_workcell.knowledge check` runs against the database.
+# Use `expression` with `table` for a value per row, or `query` with `tables` for a complete SELECT.
+
+[order_line_value]
+name = "Order line value"
+description = "What one order line is worth after its discount, before tax, in US dollars. Nothing stores it; compute it."
+aliases = ["line value", "line amount"]
+table = "purchase_order_lines"
+expression = "quantity * unit_price * (1 - COALESCE(discount_pct, 0) / 100)"
+
+[order_line_tax]
+name = "Order line tax"
+description = "Sales tax on one order line, in US dollars. An empty tax rate means no tax."
+table = "purchase_order_lines"
+expression = "quantity * unit_price * (1 - COALESCE(discount_pct, 0) / 100) * COALESCE(tax_rate, 0) / 100"
+
+[order_value]
+name = "Order value"
+description = "What a purchase order is worth: the sum of its line values, after discounts, before tax."
+aliases = ["order total", "order amount", "PO value", "spend"]
+tables = ["purchase_orders", "purchase_order_lines"]
+query = """
+SELECT o.id, o.po_number,
+       SUM(l.quantity * l.unit_price * (1 - COALESCE(l.discount_pct, 0) / 100)) AS order_value
+FROM purchase_orders o
+JOIN purchase_order_lines l ON l.purchase_order_id = o.id
+GROUP BY o.id, o.po_number
+"""
+
+[accepted_quantity]
+name = "Accepted quantity"
+description = "Units of an order line that arrived and were kept. Reversed receipts do not count."
+aliases = ["quantity accepted", "received and accepted"]
+tables = ["goods_receipts", "goods_receipt_lines"]
+query = """
+SELECT gl.purchase_order_line_id,
+       SUM(gl.quantity_received - gl.quantity_rejected) AS accepted_quantity
+FROM goods_receipt_lines gl
+JOIN goods_receipts g ON g.id = gl.goods_receipt_id
+WHERE g.status = 'posted'
+GROUP BY gl.purchase_order_line_id
+"""
+
+[amount_paid]
+name = "Amount paid per invoice"
+description = "Money actually sent for each invoice: allocations of sent or cleared payments. Scheduled payments have not paid anything yet, and failed payments never count."
+aliases = ["paid amount", "amount paid", "paid to date"]
+tables = ["payments", "payment_allocations"]
+query = """
+SELECT a.supplier_invoice_id, SUM(a.amount) AS amount_paid
+FROM payment_allocations a
+JOIN payments p ON p.id = a.payment_id
+WHERE p.status IN ('sent', 'cleared')
+GROUP BY a.supplier_invoice_id
+"""

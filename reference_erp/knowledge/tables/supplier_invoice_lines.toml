@@ -1,0 +1,27 @@
+table = "supplier_invoice_lines"
+record = "One line of a supplier invoice."
+aliases = ["invoice line"]
+
+[columns.id]
+description = "Internal number of the invoice line."
+
+[columns.supplier_invoice_id]
+description = "The invoice this line belongs to."
+link = "supplier_invoices.id"
+
+[columns.purchase_order_line_id]
+description = "The order line being billed. No foreign key. Empty for freight and service lines."
+link = "purchase_order_lines.id"
+
+[columns.description]
+description = "Text of the line as written by the supplier."
+
+[columns.quantity]
+description = "How many units are billed."
+aliases = ["invoiced quantity", "billed quantity"]
+
+[columns.unit_price]
+description = "Price billed for one unit, in US dollars, after any discount."
+
+[columns.amount]
+description = "Line amount before tax: quantity times unit_price, in US dollars."

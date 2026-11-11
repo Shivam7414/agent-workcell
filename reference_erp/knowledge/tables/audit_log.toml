@@ -1,0 +1,28 @@
+table = "audit_log"
+record = "One recorded approval or review action, for internal control."
+aliases = ["audit log", "audit trail", "history"]
+
+[columns.id]
+description = "Internal number of the log entry."
+
+[columns.user_id]
+description = "The person who did the action."
+link = "users.id"
+
+[columns.action]
+description = "What was done."
+values = { "purchase_order.approved" = "Order Approved", "supplier_invoice.approved" = "Invoice Approved", "supplier_invoice.rejected" = "Invoice Rejected" }
+
+[columns.entity_type]
+description = "The kind of record the action was on. It decides which table entity_id points to."
+values = { purchase_order = "Purchase Order", supplier_invoice = "Supplier Invoice" }
+
+[columns.entity_id]
+description = "The record the action was on."
+not_a_link = "Points to purchase_orders.id when entity_type is purchase_order, and to supplier_invoices.id when it is supplier_invoice. Join with that condition."
+
+[columns.detail]
+description = "Optional extra text about the action."
+
+[columns.created_at]
+description = "When the action was done."

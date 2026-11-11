@@ -1,0 +1,33 @@
+table = "users"
+record = "One person who can log in: company staff, or a person who works for a supplier."
+aliases = ["user", "person", "employee"]
+
+[columns.id]
+description = "Internal number of the person. Many columns in other tables hold it without a foreign key."
+
+[columns.email]
+description = "The person's e-mail address."
+
+[columns.full_name]
+description = "The person's name. Use it when an answer names a person."
+aliases = ["name"]
+
+[columns.role]
+description = "What the person does in the application."
+values = { admin = "Administrator", buyer = "Buyer", supplier_user = "Supplier User" }
+
+[columns.supplier_id]
+description = "For a supplier user, the supplier they work for. Empty for company staff."
+link = "suppliers.id"
+
+[columns.is_active]
+description = "Whether the person can still log in."
+
+[columns.created_at]
+description = "When the person was added to the system."
+
+[columns.deleted_at]
+description = "When the person was deleted in the application. Empty for people who were not deleted."
+
+[ignored]
+password_hash = "Login secret. Never shown and never needed for business questions."

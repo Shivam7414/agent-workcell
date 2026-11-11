@@ -1,0 +1,32 @@
+table = "payments"
+record = "One payment of money to a supplier. It can pay several invoices; see payment_allocations."
+aliases = ["payment", "remittance"]
+
+[columns.id]
+description = "Internal number of the payment. Payment allocations link to it."
+
+[columns.payment_number]
+description = "The payment number people use. Not the id."
+aliases = ["payment number"]
+
+[columns.supplier_id]
+description = "The supplier who is paid."
+link = "suppliers.id"
+
+[columns.method]
+description = "How the money is sent."
+values = { ach = "ACH Transfer", wire = "Wire Transfer", check = "Check" }
+aliases = ["payment method"]
+
+[columns.status]
+description = "Where the payment is. Only sent and cleared payments have paid anything."
+values = { scheduled = "Scheduled", sent = "Sent", cleared = "Cleared", failed = "Failed" }
+
+[columns.payment_date]
+description = "The date the payment was or will be sent. Scheduled payments have a date after today."
+
+[columns.amount]
+description = "Total of the payment, in US dollars. Equals the sum of its allocations."
+
+[columns.created_at]
+description = "When the payment record was created. Use payment_date for business questions."

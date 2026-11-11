@@ -1,0 +1,35 @@
+table = "purchase_order_lines"
+record = "One line of a purchase order: one product, a quantity and a price."
+aliases = ["order line", "PO line", "line item"]
+
+[columns.id]
+description = "Internal number of the order line. Receipt and invoice lines link to it."
+
+[columns.purchase_order_id]
+description = "The order this line belongs to."
+link = "purchase_orders.id"
+
+[columns.line_no]
+description = "Position of the line on the order: 1, 2, 3 and so on."
+aliases = ["line number"]
+
+[columns.product_id]
+description = "The product ordered."
+link = "products.id"
+
+[columns.description]
+description = "Text of the line as printed on the order. Usually the product name."
+
+[columns.quantity]
+description = "How many units were ordered."
+aliases = ["ordered quantity"]
+
+[columns.unit_price]
+description = "Price for one unit on this order, in US dollars, before the discount."
+
+[columns.discount_pct]
+description = "Discount on the line, in percent. Empty means no discount."
+aliases = ["discount"]
+
+[columns.tax_rate]
+description = "Sales tax on the line, in percent. Empty means no tax."

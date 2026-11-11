@@ -1,0 +1,18 @@
+table = "departments"
+record = "One department of the company that orders goods and services."
+aliases = ["department", "cost center"]
+
+[columns.id]
+description = "Internal number of the department. Other tables link to it."
+
+[columns.code]
+description = "Short code people use for the department, such as OPS or MNT."
+aliases = ["department code"]
+
+[columns.name]
+description = "Name of the department."
+aliases = ["department name"]
+
+[columns.annual_budget]
+description = "The department's yearly purchasing budget, in US dollars."
+aliases = ["budget"]

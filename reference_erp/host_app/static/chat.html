@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meridian Works purchasing assistant</title>
+<link rel="stylesheet" href="/static/chat.css">
+<script src="/static/chat.js" defer></script>
+</head>
+<body class="app">
+<aside class="rail" aria-label="Your account and notes">
+  <p class="brand"><span class="brand-mark" aria-hidden="true"></span>Meridian Works</p>
+  <p class="rail-product">Purchasing assistant</p>
+
+  <section class="person" aria-label="Signed in as">
+    <p class="person-name" id="who-name"></p>
+    <p class="person-detail" id="who-detail"></p>
+  </section>
+
+  <section class="notes" aria-labelledby="notes-title">
+    <h2 id="notes-title">Saved notes</h2>
+    <p class="hint">Ask the assistant to remember a preference or a name you use. Notes help with wording; they never
+      change what you can see.</p>
+    <ul id="notes" class="note-list"></ul>
+    <button type="button" id="clear-notes" class="quiet">Delete my notes</button>
+  </section>
+
+  <form method="post" action="/logout" class="signout"><button type="submit" class="quiet">Sign out</button></form>
+</aside>
+
+<main class="desk">
+  <div class="scope" role="note" aria-label="What you can see">
+    <span class="scope-tag" aria-hidden="true"></span>
+    <p><strong id="scope-title"></strong> <span id="scope-text"></span></p>
+  </div>
+
+  <section id="conversation" class="conversation" aria-live="polite">
+    <div id="welcome" class="welcome">
+      <h1 id="greeting">Ask about your purchasing data</h1>
+      <p>Answers come from the live ERP, limited to what you may see. Each one shows the queries behind it.</p>
+      <div id="suggestions" class="suggestions" aria-label="Questions to start with"></div>
+    </div>
+  </section>
+
+  <form id="ask" class="composer">
+    <label for="question" class="visually-hidden">Your question</label>
+    <textarea id="question" rows="1" maxlength="4000" placeholder="Ask about orders, deliveries, invoices or payments"
+              required></textarea>
+    <button type="submit" id="send" class="send" aria-label="Ask">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h13M12 5l7 7-7 7"/></svg>
+    </button>
+  </form>
+  <p class="composer-note">Enter asks. Shift and Enter start a new line.</p>
+</main>
+</body>
+</html>

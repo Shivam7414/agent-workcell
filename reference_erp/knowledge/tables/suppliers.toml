@@ -1,0 +1,38 @@
+table = "suppliers"
+record = "One company that sells goods or services to the company."
+aliases = ["supplier", "vendor"]
+
+[columns.id]
+description = "Internal number of the supplier. Other tables link to it."
+
+[columns.supplier_number]
+description = "The supplier number people use. Not the id."
+aliases = ["supplier number", "vendor number"]
+
+[columns.name]
+description = "Name of the supplier."
+aliases = ["supplier name", "vendor name"]
+
+[columns.status]
+description = "Whether the company may order from the supplier."
+values = { active = "Active", on_hold = "On Hold", blocked = "Blocked" }
+
+[columns.city]
+description = "City of the supplier's address."
+
+[columns.payment_terms_days]
+description = "How many days after the invoice date an invoice from this supplier is due."
+aliases = ["payment terms"]
+
+[columns.tax_id]
+description = "The supplier's tax number. Sensitive."
+not_a_link = "A tax number issued outside the company, not a reference to another table."
+
+[columns.bank_account]
+description = "The supplier's bank account number. Sensitive."
+
+[columns.created_at]
+description = "When the supplier was added to the system."
+
+[columns.deleted_at]
+description = "When the supplier was deleted in the application. Empty for suppliers that were not deleted."
