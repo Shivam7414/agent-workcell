@@ -81,6 +81,7 @@ docker compose run --rm guard apply   # install the data guard on the local erp 
 | `tests/runtime_conformance/` | The Claude adapter against a real model. By hand only; costs money. |
 | `bench/` | Benchmarks (`guard_latency/`) and recorded results (`results/`) |
 | `docs/` | Design, security model, status and plans |
+| `website/` | The public page: static HTML, CSS and JavaScript, no build. Not part of the package. Rules in `website/README.md`. |
 | `.claude/rules/` | Rules for each module. They load when you open that module's files. |
 | `docker/`, `compose.yaml` | The local environment |
 

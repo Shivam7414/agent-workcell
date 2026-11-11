@@ -1,0 +1,95 @@
+/* Design tokens. Every colour, size and duration on the site comes from here.
+
+   The palette is the palette of a real workcell:
+     blue    engineered and trusted: the parts this project builds
+     orange  the reused agent, and anything untrusted or refused
+     yellow  guarding
+     cyan    data that was allowed through
+*/
+
+@font-face {
+  font-family: "Archivo";
+  src: url("../fonts/archivo-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Martian Mono";
+  src: url("../fonts/martian-mono-latin.woff2") format("woff2");
+  font-weight: 100 800;
+  font-stretch: 75% 112.5%;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --ink-0: #f4f5f8;
+  --ink-1: #ffffff;
+  --ink-2: #f0f2f6;
+  --ink-3: #e7eaf1;
+
+  /* Lines */
+  --line: #e2e5ec;
+  --line-2: #d2d7e1;
+  --line-3: #a9b1c1;
+
+  /* Text */
+  --text: #0b0d12;
+  --text-2: #434a5a;
+  --text-3: #687083;
+
+  /* Meaning */
+  --blue: #1f44ff;
+  --blue-soft: rgba(31, 68, 255, 0.08);
+  --accent: var(--blue);
+  --cyan: #0a8fb0;
+  --cyan-fill: #19c3e6;
+  --cyan-soft: rgba(25, 195, 230, 0.14);
+  --amber: #d9480f;
+  --orange-fill: #ff5b24;
+  --amber-soft: rgba(255, 91, 36, 0.1);
+  --yellow: #ffc400;
+
+  /* Chart series, checked for colour-vision separation on the light surface */
+  --series-guarded: #1f44ff;
+  --series-plain: #e8590c;
+
+  --shadow: 0 1px 0 rgba(11, 13, 18, 0.03), 0 28px 56px -32px rgba(24, 36, 90, 0.28);
+
+  /* Type */
+  --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "Martian Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  --step--2: 0.74rem;
+  --step--1: 0.84rem;
+  --step-0: 1.0625rem;
+  --step-1: 1.25rem;
+  --step-2: clamp(1.4rem, 1.1rem + 1vw, 1.75rem);
+  --step-3: clamp(2.1rem, 1.2rem + 3.3vw, 3.7rem);
+  --step-4: clamp(2.7rem, 1.2rem + 4.6vw, 4.9rem);
+
+  /* Space */
+  --gutter: clamp(20px, 4.4vw, 64px);
+  --page: 1240px;
+  --section: clamp(48px, 6vw, 84px);
+
+  /* Shape */
+  --r-1: 8px;
+  --r-2: 14px;
+  --r-3: 28px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --fast: 160ms;
+  --mid: 420ms;
+  --slow: 900ms;
+
+  --nav-h: 64px;
+}

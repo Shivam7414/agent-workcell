@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://shivam7414.github.io/agent-workcell/sitemap.xml

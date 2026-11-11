@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+
+  <title>Agent Workcell: reuse the agent, engineer the environment</title>
+  <meta name="description" content="An open-source architecture for enterprise AI applications. It reuses Claude Code as its agent runtime and engineers the environment around it: checked knowledge, tools over MCP, database-enforced access, audit and evaluation.">
+  <link rel="canonical" href="https://shivam7414.github.io/agent-workcell/">
+  <meta name="theme-color" content="#f4f5f8">
+  <meta name="color-scheme" content="light">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Agent Workcell">
+  <meta property="og:title" content="Reuse the agent. Engineer the environment.">
+  <meta property="og:description" content="An alternative architecture for enterprise AI applications, built around Claude Code, an existing autonomous agent runtime. Open source, Apache-2.0.">
+  <meta property="og:url" content="https://shivam7414.github.io/agent-workcell/">
+  <meta property="og:image" content="https://shivam7414.github.io/agent-workcell/assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Isometric drawing of Claude Code, as a robot arm, inside an engineered cell, with the headline: Reuse the agent. Engineer the environment.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Reuse the agent. Engineer the environment.">
+  <meta name="twitter:description" content="An alternative architecture for enterprise AI applications, built around Claude Code, an existing autonomous agent runtime.">
+  <meta name="twitter:image" content="https://shivam7414.github.io/agent-workcell/assets/og.png">
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/martian-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/sections.css">
+  <script type="module" src="assets/js/main.js"></script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "Agent Workcell",
+    "description": "An architecture for enterprise AI applications that reuses Claude Code as its agent runtime and engineers the environment around it.",
+    "codeRepository": "https://github.com/Shivam7414/agent-workcell",
+    "programmingLanguage": "Python",
+    "license": "https://www.apache.org/licenses/LICENSE-2.0"
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" data-nav>
+    <div class="wrap nav__inner">
+      <a class="nav__brand" href="#top" aria-label="Agent Workcell, back to top">
+        <svg class="nav__mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M9 3H4a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1h-5"/>
+          <circle cx="12" cy="12" r="3.4" fill="currentColor" stroke="none"/>
+        </svg>
+        Agent Workcell
+      </a>
+      <nav class="nav__links" aria-label="Sections">
+        <a href="#idea">Idea</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#runtime">Claude Code</a>
+        <a href="#knowledge">Knowledge</a>
+        <a href="#guard">Data guard</a>
+        <a href="#walkthrough">Walkthrough</a>
+        <a href="#evaluation">Evaluation</a>
+        <a href="#run">Run it</a>
+      </nav>
+      <a class="btn btn--line btn--small nav__cta" href="https://github.com/Shivam7414/agent-workcell" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>
+        GitHub
+      </a>
+      <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="nav-sheet" data-nav-toggle>
+        <span class="visually-hidden">Menu</span>
+        <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 5h14M2 9h14M2 13h14"/></svg>
+      </button>
+    </div>
+    <span class="nav__progress" data-nav-progress aria-hidden="true"></span>
+    <div class="nav__sheet" id="nav-sheet" hidden data-nav-sheet>
+      <a href="#idea">Idea</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#runtime">Claude Code</a>
+      <a href="#knowledge">Knowledge</a>
+      <a href="#guard">Data guard</a>
+      <a href="#walkthrough">Walkthrough</a>
+      <a href="#evaluation">Evaluation</a>
+      <a href="#run">Run it</a>
+      <a href="https://github.com/Shivam7414/agent-workcell" rel="noopener">GitHub</a>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ================= Hero ================= -->
+    <section class="hero" id="top">
+      <div class="wrap hero__grid">
+        <div class="hero__text">
+          <h1 class="hero__title">
+            <span class="ln"><span>Reuse the agent.</span></span>
+            <span class="ln"><span>Engineer the environment.</span></span>
+          </h1>
+          <p class="hero__lead">An alternative architecture for enterprise AI applications. It takes an existing autonomous agent runtime, Claude Code, and builds the workplace around it.</p>
+          <p class="hero__sub">Checked business knowledge and tools over MCP. Access decided by the database. Identity, audit and evaluation.</p>
+          <div class="btn-row">
+            <a class="btn btn--primary" href="https://github.com/Shivam7414/agent-workcell" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>
+              View on GitHub
+            </a>
+            <a class="btn btn--line" href="#architecture">Explore the architecture</a>
+          </div>
+          <ul class="hero__facts">
+            <li>Runs on Claude Code</li>
+            <li>Open source, Apache-2.0</li>
+            <li>Early stage, not independently reviewed</li>
+            <li>Built and tested on PostgreSQL</li>
+          </ul>
+        </div>
+
+        <figure class="hero__fig" data-hero>
+          <canvas class="scene" data-scene role="img" aria-label="An isometric drawing of the workcell. A robot arm, which stands for Claude Code, the reused agent runtime, works inside a fenced cell. A question arrives with the person's identity. The arm reads the knowledge graph, picks one of five tools, and reaches the business database only through the gate of the data guard. The answer leaves and is recorded."></canvas>
+          <ol class="hero__steps" data-hero-steps>
+            <li data-n="1">A question arrives. The host application says who is asking.</li>
+            <li data-n="2">Claude Code looks up what the words mean in the knowledge graph.</li>
+            <li data-n="3">It picks one of five tools. Nothing else is in reach.</li>
+            <li data-n="4">At the guard, the database returns only this person's rows.</li>
+            <li data-n="5">The answer leaves. The audit record keeps the query.</li>
+          </ol>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ================= Premise ================= -->
+    <section class="premise" aria-labelledby="premise-h">
+      <div class="wrap premise__grid">
+        <div>
+          <h2 class="visually-hidden" id="premise-h">The workcell idea</h2>
+          <p class="premise__say">In a factory, nobody builds a new robot for each job. They take a general-purpose robot and build a workcell around it: fixtures, tooling and safety guarding.</p>
+          <p class="premise__say premise__say--strong">The robot is reused. The cell is engineered.</p>
+        </div>
+        <table class="premise__map">
+          <caption class="visually-hidden">How the factory idea maps to this project</caption>
+          <thead>
+            <tr><th scope="col">In the factory</th><th scope="col">In this project</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">The robot</th><td>Claude Code, an existing agent runtime, reused as it is</td></tr>
+            <tr><th scope="row">Fixtures</th><td>A knowledge graph, checked against the live database</td></tr>
+            <tr><th scope="row">Tooling</th><td>Five tools over MCP: read knowledge, read data, make files</td></tr>
+            <tr><th scope="row">Safety guarding</th><td>A data guard, where the database decides access</td></tr>
+            <tr><th scope="row">Cell controller</th><td>A server for identity, limits, memory and audit</td></tr>
+            <tr><th scope="row">Acceptance tests</th><td>Benchmark cases graded against the database</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= Idea: the problem and the shift ================= -->
+    <section class="sec" id="idea">
+      <div class="wrap idea" data-shift>
+        <div class="idea__text">
+          <div class="idea__block" data-shift-step="a">
+            <h2>Are we rebuilding too much of the agent?</h2>
+            <div class="prose">
+              <p>Many teams build agents on a raw model API. Each team then writes the same machinery again: intent detection, routing, context management, tool orchestration, multi-step execution and retries.</p>
+              <p>That path works. A raw API can power a capable autonomous agent, and many good systems are built that way.</p>
+              <p>The question here is narrower. How much of that machinery is specific to your business?</p>
+            </div>
+          </div>
+
+          <div class="idea__block" data-shift-step="b">
+            <h2>Keep the agent. Build the rest.</h2>
+            <div class="prose">
+              <p>An agent runtime is a program that runs a model in a loop with tools. It is hard to build well, and it is already available. Agent Workcell reuses Claude Code, through the Claude Agent SDK, and treats it as a replaceable part.</p>
+              <p>What makes an answer right and safe sits around the runtime. It is what the agent knows, what it can touch and what stops it. That part is specific to each business. It is the part this project engineers.</p>
+              <p>One agent sees the whole question. So the project builds no intent classifier and no router.</p>
+              <p class="note">This is one approach under test. It is not a verdict on the others. A plain model-API tool loop is planned as a benchmark baseline. No comparison is claimed until that run is recorded.</p>
+            </div>
+          </div>
+        </div>
+
+        <figure class="idea__fig">
+          <canvas class="scene scene--shift" data-shift-canvas role="img" aria-label="Ten blocks stand in a line: the parts of a custom orchestration layer. As the page scrolls, four of them stack into one reused agent runtime, Claude Code. Two are removed because they are not needed. The rest move outward and become the engineered environment: identity, knowledge graph, tools over MCP, data guard, audit and evaluation."></canvas>
+          <div class="idea__bar" aria-hidden="true">
+            <span>Custom orchestration</span>
+            <span class="idea__meter"><i data-shift-meter></i></span>
+            <span>Agent Workcell</span>
+          </div>
+          <ul class="idea__key">
+            <li class="k-runtime">Reused: Claude Code</li>
+            <li class="k-env">Engineered: the environment</li>
+            <li class="k-drop">Not needed</li>
+          </ul>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ================= Architecture explorer ================= -->
+    <section class="sec" id="architecture">
+      <div class="wrap">
+        <header class="sec__head">
+          <h2>The parts of the cell</h2>
+          <div class="sec__lead">
+            <p>Ten parts, each with one job. Select a part to see what it does, where its code is and which tests cover it.</p>
+          </div>
+        </header>
+
+        <div class="xp" data-explorer>
+          <div class="xp__stage">
+            <canvas class="scene scene--explore" data-xp-canvas aria-hidden="true"></canvas>
+            <div class="xp__parts" role="group" aria-label="Parts of the cell" data-xp-parts></div>
+          </div>
+          <div class="xp__panel" data-xp-panel aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ================= Claude Code ================= -->
+    <section class="sec" id="runtime">
+      <div class="wrap">
+        <header class="sec__head">
+          <h2>Claude Code does the agent work</h2>
+          <div class="sec__lead">
+            <p>Claude Code runs the model in a loop. It reads the question, calls a tool, reads the result and decides the next step, turn after turn. The project rebuilds none of that.</p>
+            <p>Claude Code also ships with a shell, file access and the web. Inside the cell, all of it is removed. It keeps the loop and gets five tools.</p>
+          </div>
+        </header>
+
+        <figure class="fig rt" data-rt>
+          <div class="fig__body rt__body">
+            <div class="rt__col rt__col--kept">
+              <h3>Kept: the agent</h3>
+              <p class="rt__sub">What Claude Code does, reused as it is</p>
+              <ul class="rt__list">
+                <li>The loop of model and tools</li>
+                <li>Work over many turns, up to a limit</li>
+                <li>The whole question in one context</li>
+                <li>A new try after a failed query</li>
+              </ul>
+              <p class="rt__foot">Claude Code decides how to answer. The cell decides what it can reach.</p>
+            </div>
+
+            <div class="rt__col rt__col--removed">
+              <h3>Removed: its own tools</h3>
+              <p class="rt__sub">All 30 are named in <code>BUILT_IN_TOOLS</code> and switched off twice</p>
+              <ul class="rt__wall" data-rt-wall>
+                <li>Bash</li><li>BashOutput</li><li>KillShell</li><li>Read</li><li>Write</li><li>Edit</li>
+                <li>MultiEdit</li><li>NotebookEdit</li><li>Glob</li><li>Grep</li><li>LS</li><li>WebFetch</li>
+                <li>WebSearch</li><li>Agent</li><li>Task</li><li>TaskStop</li><li>TaskCreate</li><li>TaskGet</li>
+                <li>TaskUpdate</li><li>TaskList</li><li>TodoWrite</li><li>Skill</li><li>SlashCommand</li>
+                <li>AskUserQuestion</li><li>EnterPlanMode</li><li>ExitPlanMode</li><li>ListMcpResourcesTool</li>
+                <li>ReadMcpResourceTool</li><li>Monitor</li><li>ToolSearch</li>
+              </ul>
+            </div>
+
+            <div class="rt__col rt__col--added">
+              <h3>Added: five tools over MCP</h3>
+              <p class="rt__sub">Each acts as the person who asked</p>
+              <ul class="rt__tools">
+                <li><code>knowledge</code><span>What the words of the question mean</span></li>
+                <li><code>get_schema</code><span>The columns this role can read</span></li>
+                <li><code>run_query</code><span>One read-only query, through the guard</span></li>
+                <li><code>create_file</code><span>A file the server builds from a query</span></li>
+                <li><code>remember</code><span>A short note, when the person asks</span></li>
+              </ul>
+            </div>
+          </div>
+          <figcaption class="fig__cap">
+            <span class="fig__no">Fig. 1</span>
+            <span>What the adapter keeps, removes and adds</span>
+            <a class="fig__src" href="https://github.com/Shivam7414/agent-workcell/blob/main/src/agent_workcell/runtime/claude.py" rel="noopener">src/agent_workcell/runtime/claude.py</a>
+          </figcaption>
+        </figure>
+
+        <div class="rt__more">
+          <div class="code">
+            <div class="code__bar"><a href="https://github.com/Shivam7414/agent-workcell/blob/main/src/agent_workcell/runtime/claude.py" rel="noopener">The options the adapter passes to the Claude Agent SDK</a></div>
+<pre>ClaudeAgentOptions(
+<span class="hl">    tools=[],</span>
+    allowed_tools=[PREFIX + name for name in TOOL_NAMES],
+<span class="hl">    disallowed_tools=list(BUILT_IN_TOOLS),</span>
+<span class="hl">    permission_mode="dontAsk",</span>
+    system_prompt={"type": "file", "path": str(prompt_file)},
+    mcp_servers={SERVER_NAME: {"type": "http", "url": request.mcp_url,
+                               "headers": {"Authorization": f"Bearer {request.mcp_token}"}}},
+<span class="hl">    strict_mcp_config=True,</span>
+<span class="hl">    setting_sources=[],</span>
+    cwd=str(workdir),
+    max_turns=request.max_turns,
+    max_budget_usd=request.max_usd,
+    model=request.model,
+    env=env,
+)</pre>
+          </div>
+
+          <div class="rt__notes">
+            <dl class="rt__profile">
+              <div><dt>No tools of its own</dt><dd><code>tools=[]</code> removes them. <code>disallowed_tools</code> names each one again, so one change in the SDK does not open them.</dd></div>
+              <div><dt>Only the five project tools</dt><dd><code>permission_mode="dontAsk"</code> denies every other call. Nothing is ever prompted.</dd></div>
+              <div><dt>Nothing from disk</dt><dd>No settings, MCP servers, <code>CLAUDE.md</code> files or skills are loaded. Each run starts in a new empty folder, deleted afterwards.</dd></div>
+              <div><dt>No server secrets</dt><dd>Database addresses, passwords and the host key are blanked. The run's own token stays in the MCP headers, out of the model's view.</dd></div>
+              <div><dt>Bounded</dt><dd>A turn limit and a cost limit for every run. The server adds a time limit.</dd></div>
+            </dl>
+            <p class="note"><span class="tag tag--plain">Checked by hand</span> On 2026-11-11, with <code>claude-agent-sdk</code> 0.2.180 and <code>claude-opus-5-5</code> in the sign-in mode, the conformance tests asked Claude Code to read a file, run a command, fetch a URL and read an environment variable. All four were blocked. A control test that opens the file tool on purpose was caught.</p>
+            <p class="note"><span class="tag tag--plain">To verify</span> Two checks of the isolated mode need an API key and have not run: no account details reach the model, and no transcript is left behind.</p>
+            <p class="note"><span class="tag tag--plain">Replaceable</span> The runtime interface is small: start a run, get a stream of events. A scripted runtime already uses it for the tests. Another adapter is added only when there is a real need.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Knowledge graph ================= -->
+    <section class="sec" id="knowledge">
+      <div class="wrap">
+        <header class="sec__head">
+          <h2>Business meaning, written once and checked</h2>
+          <div class="sec__lead">
+            <p>A schema does not say what the data means. The knowledge graph does, in TOML files that people write by hand.</p>
+            <p>A check compares those files with the live database. It fails when the system changes and the knowledge does not.</p>
+          </div>
+        </header>
+
+        <figure class="fig">
+          <div class="fig__body">
+            <div class="kg" data-kg data-facet="record">
+              <div class="kg__facets vtabs" role="tablist" aria-label="What the graph holds" data-kg-tabs>
+                <button type="button" role="tab" data-facet="record" aria-selected="true"><strong>Records</strong><span>What one row is</span></button>
+                <button type="button" role="tab" data-facet="link" aria-selected="false"><strong>Links</strong><span>Joins with no foreign key</span></button>
+                <button type="button" role="tab" data-facet="words" aria-selected="false"><strong>Screen words</strong><span>Stored values, as people see them</span></button>
+                <button type="button" role="tab" data-facet="calc" aria-selected="false"><strong>Calculations</strong><span>SQL that the check runs</span></button>
+                <button type="button" role="tab" data-facet="rule" aria-selected="false"><strong>Rules</strong><span>Each tied to its source code</span></button>
+                <button type="button" role="tab" data-facet="path" aria-selected="false"><strong>Join paths</strong><span>Shortest is not always right</span></button>
+              </div>
+
+              <div class="kg__stage">
+                <div class="kg__map" data-kg-map>
+                  <svg class="wires" data-wires aria-hidden="true"></svg>
+                  <div class="kg__node kg__node--lines" data-t="purchase_order_lines"><code>purchase_<wbr>order_<wbr>lines</code><span>what is on an order</span></div>
+                  <div class="kg__node kg__node--suppliers" data-t="suppliers"><code>suppliers</code><span>a company that sells to us</span></div>
+                  <div class="kg__node kg__node--orders" data-t="purchase_orders"><code>purchase_<wbr>orders</code><span>an order to one supplier</span></div>
+                  <div class="kg__node kg__node--payments" data-t="payments"><code>payments</code><span>money sent to a supplier</span></div>
+                  <div class="kg__node kg__node--invoices" data-t="supplier_invoices"><code>supplier_<wbr>invoices</code><span>a supplier's bill</span></div>
+                  <div class="kg__node kg__node--alloc" data-t="payment_allocations"><code>payment_<wbr>allocations</code><span>which invoice a payment pays</span></div>
+                  <p class="kg__verdict kg__verdict--bad" data-kg-bad>Two hops through a shared parent. It pairs every order with every payment of that supplier.</p>
+                  <p class="kg__verdict kg__verdict--good" data-kg-good>Three hops. Each payment meets only the invoices it pays.</p>
+                </div>
+
+                <div class="kg__detail" data-kg-detail aria-live="polite"></div>
+              </div>
+            </div>
+          </div>
+          <figcaption class="fig__cap">
+            <span class="fig__no">Fig. 2</span>
+            <span>Six tables of the reference ERP, and what the graph records about them</span>
+            <a class="fig__src" href="https://github.com/Shivam7414/agent-workcell/tree/main/reference_erp/knowledge" rel="noopener">reference_erp/knowledge/</a>
+          </figcaption>
+        </figure>
+
+        <div class="cols cols--3 kg__notes">
+          <div class="prose">
+            <h3>What the check catches</h3>
+            <ul class="ticks">
+              <li>A table or column that is not described, or no longer exists</li>
+              <li>A stored value with no screen words</li>
+              <li>A link that matches fewer than 95% of the filled rows</li>
+              <li>A calculation whose SQL does not run</li>
+              <li>A rule whose source file or name is gone</li>
+              <li>A generated guide that is stale</li>
+            </ul>
+            <p class="note">The check proves that names are real. It cannot prove that a description is still true.</p>
+          </div>
+          <div class="prose">
+            <h3>Where this approach fits</h3>
+            <p>It fits structured business data, where the meaning is small enough to write down and check. The reference knowledge covers 13 tables, 5 calculations and 12 rules.</p>
+            <p>There is no vector database. Retrieval matches the words of a question against table names, aliases, stored values and screen words. Business questions are full of such names.</p>
+            <p>Each role gets its own generated guide. It lists only the tables and columns that role can read.</p>
+          </div>
+          <div class="prose">
+            <h3>Where retrieval is still needed</h3>
+            <p>Word matching has known limits. A word that is not a name, an alias or a screen word is not found. A bare number does not point to a table.</p>
+            <p>Large bodies of free text, such as contracts or support tickets, still call for search or embedding retrieval. The project adds that layer only if a benchmark shows word matching is the problem.</p>
+            <p class="note"><span class="tag tag--plain">To verify</span> Whether word matching is enough. The recorded run is too small to tell.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Data guard ================= -->
+    <section class="sec" id="guard">
+      <div class="wrap">
+        <header class="sec__head">
+          <h2>The model reasons. The database enforces.</h2>
+          <div class="sec__lead">
+            <p>The agent writes SQL, and that SQL is always treated as untrusted. No prompt and no SQL parser decides what it may read.</p>
+            <p>The database decides. Row rules, hidden columns and table access are grants and views, so they apply to every access path.</p>
+          </div>
+        </header>
+
+        <figure class="fig">
+          <div class="fig__body">
+            <div class="gd" data-guard>
+              <div class="gd__controls">
+                <fieldset class="gd__field">
+                  <legend>Who the server has bound</legend>
+                  <div class="switch" data-gd-people>
+                    <label><input type="radio" name="gd-person" value="admin"><span>Administrator</span></label>
+                    <label><input type="radio" name="gd-person" value="buyer" checked><span>Buyer</span></label>
+                    <label><input type="radio" name="gd-person" value="supplier"><span>Supplier user</span></label>
+                    <label><input type="radio" name="gd-person" value="nobody"><span>Nobody</span></label>
+                  </div>
+                </fieldset>
+                <fieldset class="gd__field">
+                  <legend>SQL the model sends</legend>
+                  <div class="gd__queries" data-gd-queries></div>
+                </fieldset>
+              </div>
+
+              <div class="gd__stage">
+                <ol class="gd__track" data-gd-track aria-hidden="true">
+                  <li class="gd__end gd__end--in"><span class="tag tag--untrusted">Model output</span></li>
+                  <li class="gd__gate" data-gate="cursor"><i></i><b>One read-only query</b><span>Server-side cursor, read-only transaction</span></li>
+                  <li class="gd__gate" data-gate="grants"><i></i><b>Guard views only</b><span>Grants on the agent's database role</span></li>
+                  <li class="gd__gate" data-gate="rows"><i></i><b>Row rule for this person</b><span>The view's condition for the bound role</span></li>
+                  <li class="gd__end gd__end--out"><span class="tag tag--trusted">Business database</span></li>
+                </ol>
+                <div class="gd__verdict" data-gd-verdict aria-live="polite"></div>
+                <div class="code gd__view">
+                  <div class="code__bar"><span>What <code>guard plan</code> installs for one table</span></div>
+                  <pre data-gd-view></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption class="fig__cap">
+            <span class="fig__no">Fig. 3</span>
+            <span>Each query and its outcome come from the attack suite</span>
+            <a class="fig__src" href="https://github.com/Shivam7414/agent-workcell/blob/main/tests/security/test_attack_suite.py" rel="noopener">tests/security/test_attack_suite.py</a>
+          </figcaption>
+        </figure>
+
+        <div class="controls">
+          <article>
+            <h3>Identity comes from the server</h3>
+            <p>The host application signs the person in and sends the principal. The server binds it to one database connection. No tool has a user argument, and a test fails if one appears.</p>
+          </article>
+          <article>
+            <h3>Access is grants and views</h3>
+            <p>One <code>security_barrier</code> view per table lists the visible columns and applies the role's row rule. The agent's database role can read those views and nothing else.</p>
+          </article>
+          <article>
+            <h3>One read-only query at a time</h3>
+            <p>Each query runs as a server-side cursor in a read-only transaction, then rolls back. PostgreSQL itself refuses a second statement, <code>SET</code>, <code>COPY</code> and every write.</p>
+          </article>
+          <article>
+            <h3>Every run is bounded</h3>
+            <p>Each query has a time limit, a row cap and a size cap. Each answer has time, cost and turn limits. Each person has daily limits.</p>
+          </article>
+          <article>
+            <h3>Fail closed</h3>
+            <p>A table, column or person the policy does not name gets nothing. <code>guard doctor</code> checks the install at start-up. If it finds an error, the service does not start.</p>
+          </article>
+          <article>
+            <h3>No way out for data</h3>
+            <p>Claude Code's own shell, file and web tools are removed. The server cleans the answer HTML, removes images and shows links as plain text.</p>
+          </article>
+        </div>
+
+        <aside class="limits" aria-labelledby="limits-h">
+          <div>
+            <h3 id="limits-h">What this page does not claim</h3>
+            <p class="muted">The guard reduces what a wrong or hostile query can do. It is not proof of security, and its limits are documented.</p>
+            <a class="btn btn--line btn--small" href="https://github.com/Shivam7414/agent-workcell/blob/main/docs/security-model.md#known-limits" rel="noopener">Read all known limits</a>
+          </div>
+          <ul class="limits__list">
+            <li>The project has had no independent security review. Do not use it with production data.</li>
+            <li>The guard is built and tested for PostgreSQL only. MariaDB and MySQL are planned.</li>
+            <li>The agent's role can read the system catalogs: table and column names, view definitions and total row counts. It cannot read row data this way.</li>
+            <li>Query time can depend on the size of the whole table, not only on the rows a person may see.</li>
+            <li>Hostile text in a record can still produce a misleading sentence. Reading other rows or sending data out because of it is a bug.</li>
+          </ul>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ================= Walkthrough ================= -->
+    <section class="sec" id="walkthrough">
+      <div class="wrap">
+        <header class="sec__head">
+          <h2>One question, start to finish</h2>
+          <div class="sec__lead">
+            <p>Both examples come from the recorded run on the reference ERP. The SQL and the answers are quoted from the result file.</p>
+            <p>The reference ERP is a made-up buying company. It holds purchase orders, goods receipts, supplier invoices and payments.</p>
+          </div>
+        </header>
+
+        <figure class="fig">
+          <div class="fig__body">
+            <div class="tr" data-trace>
+              <div class="tr__top">
+                <fieldset class="switch" data-tr-switch>
+                  <legend class="visually-hidden">Which question to follow</legend>
+                  <label><input type="radio" name="trace" value="overdue" checked><span>A buyer asks about overdue invoices</span></label>
+                  <label><input type="radio" name="trace" value="hostile"><span>A record carries an injected instruction</span></label>
+                </fieldset>
+                <div class="tr__play">
+                  <button type="button" class="btn btn--line btn--small" data-tr-prev>Back</button>
+                  <button type="button" class="btn btn--line btn--small" data-tr-toggle>Pause</button>
+                  <button type="button" class="btn btn--line btn--small" data-tr-next>Next</button>
+                </div>
+              </div>
+              <ol class="tr__lanes" data-tr-lanes aria-hidden="true"></ol>
+              <div class="tr__body">
+                <ol class="tr__steps" data-tr-steps></ol>
+                <div class="tr__view" data-tr-view aria-live="polite"></div>
+              </div>
+            </div>
+          </div>
+          <figcaption class="fig__cap">
+            <span class="fig__no">Fig. 4</span>
+            <span>Recorded 2026-11-11, claude-opus-5-5, seed 42, 3,000 orders, no commit</span>
+            <a class="fig__src" href="https://github.com/Shivam7414/agent-workcell/blob/main/bench/results/answers-2026-11-11-claude-agent-sdk-claude-opus-5-5-10.json" rel="noopener">bench/results/answers-2026-11-11…json</a>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ================= Evaluation ================= -->
+    <section class="sec" id="evaluation">
+      <div class="wrap">
+        <header class="sec__head">
+          <h2>Measured against the database</h2>
+          <div class="sec__lead">
+            <p>Every number on this page comes from a recorded run in the repository. Each run states its date, model, commit, seed and case count.</p>
+            <p>Where no run exists, the page says so: not measured yet.</p>
+          </div>
+        </header>
+
+        <ul class="method">
+          <li><h3>Gold answers are SQL</h3><p>Gold SQL runs through the guard as the same person. It returns what that person may see.</p></li>
+          <li><h3>Probes test permissions</h3><p>A probe reads forbidden values without the guard. The answer, and any file it built, must hold none of them.</p></li>
+          <li><h3>Graders are plain code</h3><p>A number matches only as a whole number: 7 does not match 17. No model grades another model.</p></li>
+          <li><h3>The runner is a host application</h3><p>It asks over the real answer API, so every limit and every tool is the one people use.</p></li>
+          <li><h3>Cost is capped</h3><p>A real run needs a total budget. A scripted runtime checks every case at no cost.</p></li>
+        </ul>
+
+        <div class="bench" data-bench>
+          <figure class="fig bench__run">
+            <div class="fig__body">
+              <h3>The recorded answer run</h3>
+              <p class="muted bench__sub">10 of the 28 cases, one run each. Select a case to read its question.</p>
+              <div class="bench__cases" data-bench-cases></div>
+              <ul class="bench__key">
+                <li><i class="k k--ok"></i>Graded, correct</li>
+                <li><i class="k k--probe"></i>Probe, no violation</li>
+                <li><i class="k k--none"></i>Not run yet</li>
+              </ul>
+              <p class="bench__case" data-bench-case aria-live="polite"></p>
+              <dl class="bench__stats">
+                <div><dt>Graded answers correct</dt><dd>7 of 7</dd></div>
+                <div><dt>Permission violations in 3 probes</dt><dd>0</dd></div>
+                <div><dt>Total cost of the run</dt><dd>$0.45</dd></div>
+                <div><dt>Median time per answer</dt><dd>9.2 s</dd></div>
+              </dl>
+              <p class="bench__caveat">With 7 graded answers, the 95% interval is 0.65 to 1.0. The run shows that the system works from question to answer. It does not measure accuracy.</p>
+            </div>
+            <figcaption class="fig__cap">
+              <span class="fig__no">Fig. 5</span>
+              <span>2026-11-11, claude-opus-5-5 through claude-agent-sdk 0.2.180, sign-in mode, seed 42, 3,000 orders, no commit</span>
+              <a class="fig__src" href="https://github.com/Shivam7414/agent-workcell/blob/main/bench/results/answers-2026-11-11-claude-agent-sdk-claude-opus-5-5-10.json" rel="noopener">result file</a>
+            </figcaption>
+          </figure>
+
+          <figure class="fig bench__lat">
+            <div class="fig__body">
+              <div class="bench__lat-head">
+                <div>
+                  <h3>What the guard costs in time</h3>
+                  <p class="muted bench__sub">Median milliseconds per query. An administrator reads the same rows with and without the guard, so this pair shows the guard's own cost.</p>
+                </div>
+                <fieldset class="switch" data-bench-scale>
+                  <legend class="visually-hidden">Number of purchase orders</legend>
+                  <label><input type="radio" name="scale" value="900000" checked><span>900,000 orders</span></label>
+                  <label><input type="radio" name="scale" value="3000"><span>3,000 orders</span></label>
+                </fieldset>
+              </div>
+              <div class="lat" data-bench-lat></div>
+              <ul class="bench__key">
+                <li><i class="k k--plain"></i>Unguarded</li>
+                <li><i class="k k--guarded"></i>Through the guard, as administrator</li>
+              </ul>
+              <p class="bench__caveat" data-bench-lat-note></p>
+            </div>
+            <figcaption class="fig__cap">
+              <span class="fig__no">Fig. 6</span>
+              <span>2026-11-11, no model, seed 42, five queries, PostgreSQL 17.11 in Docker, no commit</span>
+              <a class="fig__src" href="https://github.com/Shivam7414/agent-workcell/tree/main/bench/results" rel="noopener">bench/results/</a>
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="unproven">
+          <h3>Not measured yet</h3>
+          <ul>
+            <li><strong>Accuracy.</strong> It needs all 28 cases, repeated, with a recorded commit.</li>
+            <li><strong>The gain from reuse.</strong> The plain tool-loop baseline is planned, so no comparison exists.</li>
+            <li><strong>Retrieval by word matching.</strong> Seven graded answers cannot show whether it is enough.</li>
+            <li><strong>The runtime's isolated mode.</strong> Two of its checks need an API key and have not run.</li>
+          </ul>
+          <a class="btn btn--line btn--small" href="https://github.com/Shivam7414/agent-workcell/blob/main/docs/roadmap.md" rel="noopener">Read the status page</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Open source ================= -->
+    <section class="sec" id="run">
+      <div class="wrap">
+        <header class="sec__head">
+          <h2>Open source, open to review</h2>
+          <div class="sec__lead">
+            <p>The project is at an early stage. The most useful contributions now are a review of the design and attempts to bypass the data guard.</p>
+            <p>You need Docker, or Python 3.11 or later with a PostgreSQL server.</p>
+          </div>
+        </header>
+
+        <div class="run" data-run>
+          <div class="run__tabs vtabs" role="tablist" aria-label="Ways to take part">
+            <button type="button" role="tab" id="run-t-run" aria-controls="run-p-run" aria-selected="true"><strong>Run the sample</strong><span>The reference ERP, on your machine</span></button>
+            <button type="button" role="tab" id="run-t-inspect" aria-controls="run-p-inspect" aria-selected="false" tabindex="-1"><strong>Inspect the architecture</strong><span>Read what is installed and sent</span></button>
+            <button type="button" role="tab" id="run-t-repro" aria-controls="run-p-repro" aria-selected="false" tabindex="-1"><strong>Reproduce the evaluation</strong><span>Free with the scripted runtime</span></button>
+            <button type="button" role="tab" id="run-t-sec" aria-controls="run-p-sec" aria-selected="false" tabindex="-1"><strong>Review the security</strong><span>Try to get past the guard</span></button>
+            <button type="button" role="tab" id="run-t-contrib" aria-controls="run-p-contrib" aria-selected="false" tabindex="-1"><strong>Contribute a change</strong><span>Small, tested, on one subject</span></button>
+          </div>
+
+          <div class="run__panels">
+            <div class="run__panel" role="tabpanel" id="run-p-run" aria-labelledby="run-t-run">
+              <div class="code">
+                <div class="code__bar"><span>Start the database, load the data, install the guard</span><button type="button" class="code__copy" data-copy>Copy</button></div>
+<pre>git clone https://github.com/Shivam7414/agent-workcell.git
+cd agent-workcell
+cp .env.example .env
+docker compose up -d db                  <span class="c"># PostgreSQL on 127.0.0.1:54329</span>
+docker compose run --rm seed             <span class="c"># the reference ERP: 3,000 purchase orders</span>
+docker compose run --rm guard apply      <span class="c"># install the data guard, then check it</span></pre>
+              </div>
+              <div class="code">
+                <div class="code__bar"><span>Start the answer server and the chat page</span><button type="button" class="code__copy" data-copy>Copy</button></div>
+<pre>pip install -e ".[claude]"
+python -m agent_workcell.server          <span class="c"># http://127.0.0.1:8080</span>
+python -m reference_erp.host_app         <span class="c"># http://127.0.0.1:8081</span></pre>
+              </div>
+              <p class="run__note">Answers call a model and cost money. Sign in with any seeded user and the password <code>workcell-demo</code>.</p>
+              <a class="btn btn--line btn--small" href="https://github.com/Shivam7414/agent-workcell#quick-start" rel="noopener">Open the quick start</a>
+            </div>
+
+            <div class="run__panel" role="tabpanel" id="run-p-inspect" aria-labelledby="run-t-inspect" hidden>
+              <div class="code">
+                <div class="code__bar"><span>Print the SQL that the guard installs</span><button type="button" class="code__copy" data-copy>Copy</button></div>
+<pre>docker compose run --rm guard plan</pre>
+              </div>
+              <div class="code">
+                <div class="code__bar"><span>See what the knowledge graph gives the model, as one role</span><button type="button" class="code__copy" data-copy>Copy</button></div>
+<pre>python -m agent_workcell.knowledge find --role buyer "invoices in review for my orders" \
+    --knowledge reference_erp/knowledge --policy reference_erp/policy.toml</pre>
+              </div>
+              <ul class="run__links">
+                <li><a href="https://github.com/Shivam7414/agent-workcell/blob/main/docs/architecture.md" rel="noopener">Architecture</a><span>The design and the reasons behind it</span></li>
+                <li><a href="https://github.com/Shivam7414/agent-workcell/blob/main/docs/security-model.md" rel="noopener">Security model</a><span>What is trusted, what is not, and the tests</span></li>
+                <li><a href="https://github.com/Shivam7414/agent-workcell/blob/main/reference_erp/README.md" rel="noopener">Reference ERP</a><span>The schema and its deliberate traps</span></li>
+              </ul>
+            </div>
+
+            <div class="run__panel" role="tabpanel" id="run-p-repro" aria-labelledby="run-t-repro" hidden>
+              <div class="code">
+                <div class="code__bar"><span>Check all 28 cases with the scripted runtime, at no cost</span><button type="button" class="code__copy" data-copy>Copy</button></div>
+<pre>python -m agent_workcell.eval --cases reference_erp/eval_cases.toml --runtime fake</pre>
+              </div>
+              <div class="code">
+                <div class="code__bar"><span>Measure the guard's latency. No model is called.</span><button type="button" class="code__copy" data-copy>Copy</button></div>
+<pre>python bench/guard_latency/run.py --scale 1</pre>
+              </div>
+              <div class="code">
+                <div class="code__bar"><span>Run against a real model, with a total budget in US dollars</span><button type="button" class="code__copy" data-copy>Copy</button></div>
+<pre>python -m agent_workcell.eval --cases reference_erp/eval_cases.toml \
+    --runtime claude --repeats 3 --max-usd N --out bench/results</pre>
+              </div>
+              <p class="run__note">A real run costs money. It stops before the next answer could pass the budget.</p>
+            </div>
+
+            <div class="run__panel" role="tabpanel" id="run-p-sec" aria-labelledby="run-t-sec" hidden>
+              <div class="code">
+                <div class="code__bar"><span>Run the attack suite against a test database</span><button type="button" class="code__copy" data-copy>Copy</button></div>
+<pre>export ERP_TEST_DATABASE_URL=postgresql://erp_owner:erp_owner_dev@127.0.0.1:54329/erp_test
+pytest -m db</pre>
+              </div>
+              <p class="run__note">The suite runs hostile queries as six test people. Each result must equal the result on a schema that holds only that person's rows.</p>
+              <p class="run__note">A new bypass idea is welcome as a test case, even one that already fails. Report a real problem in private, through the repository's security advisories.</p>
+              <div class="btn-row">
+                <a class="btn btn--line btn--small" href="https://github.com/Shivam7414/agent-workcell/tree/main/tests/security" rel="noopener">Open the attack suite</a>
+                <a class="btn btn--line btn--small" href="https://github.com/Shivam7414/agent-workcell/blob/main/SECURITY.md" rel="noopener">Read the security policy</a>
+              </div>
+            </div>
+
+            <div class="run__panel" role="tabpanel" id="run-p-contrib" aria-labelledby="run-t-contrib" hidden>
+              <div class="code">
+                <div class="code__bar"><span>Before you open a pull request</span><button type="button" class="code__copy" data-copy>Copy</button></div>
+<pre>python -m venv .venv
+.venv/bin/pip install -e ".[dev]"        <span class="c"># Windows: .venv\Scripts\pip</span>
+.venv/bin/ruff check .
+.venv/bin/pytest</pre>
+              </div>
+              <ul class="ticks">
+                <li>Keep a change small and on one subject.</li>
+                <li>A change to a security rule comes with a test that fails without it.</li>
+                <li>A new dependency needs a reason in the pull request.</li>
+                <li>A performance or accuracy number needs a recorded run.</li>
+              </ul>
+              <a class="btn btn--line btn--small" href="https://github.com/Shivam7414/agent-workcell/blob/main/CONTRIBUTING.md" rel="noopener">Read the contributing guide</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Final call ================= -->
+    <section class="cta">
+      <div class="wrap cta__inner">
+        <h2>Don't just take the architecture on trust. <span>Run it. Inspect it. Challenge it.</span></h2>
+        <div class="btn-row">
+          <a class="btn btn--primary" href="https://github.com/Shivam7414/agent-workcell" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>
+            View on GitHub
+          </a>
+          <a class="btn btn--line" href="https://github.com/Shivam7414/agent-workcell/blob/main/docs/architecture.md" rel="noopener">Read the architecture</a>
+          <a class="btn btn--line" href="https://github.com/Shivam7414/agent-workcell/blob/main/docs/security-model.md" rel="noopener">Read the security model</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot__grid">
+      <div>
+        <p>Agent Workcell is open source under the Apache-2.0 licence. It is at an early stage and has not had an independent security review. Do not use it with production data.</p>
+        <p>Claude Code is a separate product. This project is independent of it and of its maker.</p>
+        <p>Every company, person and number in the reference ERP is made up. Fonts: Archivo and Martian Mono, under the SIL Open Font License.</p>
+      </div>
+      <nav class="foot__links" aria-label="Project links">
+        <a href="https://github.com/Shivam7414/agent-workcell" rel="noopener">GitHub</a>
+        <a href="https://github.com/Shivam7414/agent-workcell/blob/main/docs/architecture.md" rel="noopener">Architecture</a>
+        <a href="https://github.com/Shivam7414/agent-workcell/blob/main/docs/security-model.md" rel="noopener">Security model</a>
+        <a href="https://github.com/Shivam7414/agent-workcell/blob/main/docs/roadmap.md" rel="noopener">Status and plans</a>
+        <a href="https://github.com/Shivam7414/agent-workcell/blob/main/CONTRIBUTING.md" rel="noopener">Contributing</a>
+        <a href="https://github.com/Shivam7414/agent-workcell/blob/main/LICENSE" rel="noopener">Licence</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>
