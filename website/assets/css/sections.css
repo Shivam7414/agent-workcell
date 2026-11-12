@@ -46,6 +46,281 @@
   margin-bottom: 4px;
 }
 
+/* ---------- Small visual panels: three to a row, each a drawing with one line of text ---------- */
+
+.viz-row {
+  display: grid;
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .viz-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.viz {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 22px 22px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--ink-1);
+}
+
+.viz h3 {
+  margin-bottom: 4px;
+  font-size: var(--step-0);
+}
+
+.viz__label {
+  font-size: var(--step--1);
+  color: var(--text-3);
+}
+
+.viz__note {
+  margin-top: 4px;
+  font-size: 0.92rem;
+  color: var(--text-2);
+}
+
+.viz__src {
+  font-size: var(--step--1);
+  color: var(--text-3);
+}
+
+.viz__src a {
+  color: inherit;
+}
+
+/* Chips: short labels. "off" is struck out, "on" is something this project builds, "limit" a known gap. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 0.88rem;
+  color: var(--text-2);
+}
+
+.chip--off {
+  border-style: dashed;
+  color: var(--text-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-3);
+}
+
+.chip--on {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--text);
+}
+
+/* A chip with its explanation underneath, joined by a short blue rule. */
+.uses {
+  display: grid;
+  gap: 12px;
+}
+
+.uses li {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.uses li > span:last-child {
+  padding-left: 12px;
+  margin-left: 14px;
+  border-left: 1.5px solid rgba(31, 68, 255, 0.35);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.chip--limit {
+  border-style: dashed;
+  border-color: var(--amber);
+  color: var(--text);
+}
+
+/* Unit chart: one square per tool call, grouped and labelled by tool. One colour; the label and the position
+   carry the identity. */
+.units {
+  display: grid;
+  gap: 12px;
+}
+
+/* The squares column fits the largest group (11) on one row, so lengths compare at a glance. */
+.units__group {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.units__cells {
+  display: flex;
+  gap: 3px;
+}
+
+.units__cells i {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: var(--blue);
+}
+
+.units__group--none .units__cells i {
+  border: 1.5px dashed var(--line-3);
+  background: transparent;
+}
+
+.units__label {
+  font-size: var(--step--1);
+  color: var(--text-2);
+}
+
+.units__label b {
+  display: inline-block;
+  min-width: 1.6em;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+/* Where the work moves: the tuning a pipeline needs, and what takes its place here. */
+.moves {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.moves__box {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 12px 14px;
+  border-radius: var(--r-1);
+  font-size: var(--step--1);
+}
+
+.moves__box b {
+  font-size: 0.92rem;
+}
+
+.moves__box ul {
+  display: grid;
+  gap: 4px;
+}
+
+.moves__box--from {
+  border: 1px dashed var(--line-3);
+  color: var(--text-3);
+}
+
+.moves__box--from li {
+  text-decoration: line-through;
+  text-decoration-color: var(--line-3);
+}
+
+.moves__box--to {
+  border: 1px solid var(--blue);
+  background: var(--blue-soft);
+  color: var(--text);
+}
+
+.moves__box--to p {
+  padding-top: 6px;
+  border-top: 1px solid rgba(31, 68, 255, 0.25);
+  color: var(--text-2);
+}
+
+.moves__arrow {
+  position: relative;
+  align-self: center;
+  height: 0;
+  margin-inline: 4px;
+  border-top: 1.5px solid var(--line-3);
+}
+
+.moves__arrow::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: -5px;
+  border: 4.5px solid transparent;
+  border-left: 7px solid var(--line-3);
+  border-right: 0;
+}
+
+/* What makes a check fail: each line marked as a refusal, in the hazard colour. */
+.fails {
+  display: grid;
+  gap: 8px;
+}
+
+.fails li {
+  position: relative;
+  padding-left: 26px;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.fails li::before,
+.fails li::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0.68em;
+  width: 12px;
+  height: 1.8px;
+  border-radius: 1px;
+  background: var(--amber);
+  transform: rotate(45deg);
+}
+
+.fails li::after {
+  transform: rotate(-45deg);
+}
+
+/* Count tiles. */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tiles li {
+  display: grid;
+  gap: 2px;
+  padding: 14px 12px 12px;
+  border: 1px solid var(--line-2);
+  border-top: 3px solid var(--blue);
+  border-radius: var(--r-1);
+}
+
+.tiles b {
+  font-size: var(--step-3);
+  font-weight: 650;
+  font-stretch: 112%;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--text);
+}
+
+.tiles span {
+  font-size: var(--step--1);
+  color: var(--text-2);
+}
+
 /* Vertical tab list, used by the knowledge figure and the "Run it" section */
 .vtabs {
   display: flex;
@@ -203,7 +478,6 @@
 }
 
 .hero__lead,
-.hero__sub,
 .hero .btn-row,
 .hero__facts {
   animation: fade 0.8s ease 0.35s both;
@@ -213,11 +487,6 @@
   font-size: var(--step-1);
   line-height: 1.42;
   max-width: 33ch;
-}
-
-.hero__sub {
-  color: var(--text-2);
-  max-width: 38ch;
 }
 
 .hero__facts {
@@ -339,33 +608,115 @@
   font-weight: 600;
 }
 
-.premise__map {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.97rem;
+/* Each factory part, wired to the part of this project that plays its role. The colour of the project part
+   says what it is: orange for the reused agent, blue for what is engineered, yellow for guarding. */
+.pm {
+  --pm-c: var(--blue);
+  display: grid;
+  gap: 10px;
   align-self: start;
 }
 
-.premise__map th,
-.premise__map td {
-  padding: 12px 0;
-  text-align: left;
-  vertical-align: top;
-  border-top: 1px solid var(--line);
-  font-weight: 400;
+.pm__row {
+  display: grid;
+  grid-template-columns: minmax(0, 11rem) minmax(24px, 1fr) minmax(0, 15rem);
+  align-items: center;
 }
 
-.premise__map thead th {
-  border-top: 0;
-  padding-top: 0;
-  font-size: var(--step--1);
-  color: var(--text-3);
-}
+.pm__row--reused { --pm-c: var(--orange-fill); }
+.pm__row--built { --pm-c: var(--blue); }
+.pm__row--guard { --pm-c: var(--yellow); }
 
-.premise__map tbody th {
-  width: 38%;
-  padding-right: 18px;
+.pm__from {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
   color: var(--text-2);
+}
+
+.pm__ico {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-1);
+  background: var(--ink-0);
+  color: var(--text-2);
+}
+
+.pm__wire {
+  position: relative;
+  height: 0;
+  margin-inline: 8px;
+  border-top: 1.5px dashed var(--line-3);
+}
+
+/* An arrowhead at the project end. */
+.pm__wire::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: -4.5px;
+  border: 4px solid transparent;
+  border-left: 6px solid var(--line-3);
+  border-right: 0;
+}
+
+.pm__to {
+  display: grid;
+  gap: 1px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-2);
+  border-left: 3px solid var(--pm-c);
+  border-radius: var(--r-1);
+  background: var(--ink-1);
+}
+
+.pm__row--reused .pm__to {
+  border-style: dashed;
+  border-left-style: solid;
+  border-color: var(--orange-fill);
+  background: linear-gradient(var(--amber-soft), var(--amber-soft)), var(--ink-1);
+}
+
+/* Guarding wears the hazard marking used on the guard figure. */
+.pm__row--guard .pm__to {
+  position: relative;
+  padding-left: 20px;
+  border-left: 1px solid var(--line-2);
+  overflow: hidden;
+}
+
+.pm__row--guard .pm__to::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 7px;
+  background: repeating-linear-gradient(-45deg, var(--yellow) 0 4px, var(--text) 4px 8px);
+}
+
+.pm__to b {
+  font-size: 0.97rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pm__to span {
+  font-size: var(--step--1);
+  color: var(--text-2);
+}
+
+@media (max-width: 559px) {
+  .pm__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .pm__wire {
+    display: none;
+  }
 }
 
 @media (min-width: 960px) {
@@ -482,6 +833,376 @@
 
   .idea__block h2 {
     font-size: clamp(2rem, 1rem + 2.4vw, 3rem);
+  }
+}
+
+/* ================= Approach ================= */
+
+/* Two lanes drawn as a schematic. The pipeline lane is neutral: a typical design, not this project.
+   The Workcell lane uses the site's palette: orange phantom line for the reused agent, blue for what the
+   project engineers, the yellow hazard stripe for a call through the data guard, cyan for allowed data. */
+
+.ap {
+  --tick: 22px;
+  --wire: 1.5px;
+  display: grid;
+  gap: 28px;
+}
+
+.ap__switch {
+  justify-self: start;
+}
+
+.ap__q {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  max-width: none;
+  font-size: var(--step-2);
+  font-stretch: 106%;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.ap__q .tag {
+  transform: translateY(-0.2em);
+}
+
+.ap__lane {
+  display: grid;
+  gap: 18px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.ap__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.ap__head h3 {
+  font-size: var(--step-0);
+}
+
+.ap__lane--cell .ap__head h3 {
+  color: var(--blue);
+}
+
+/* ---------- The line of stations, with wires between them ---------- */
+
+/* One wire runs behind the whole line. Stations sit on it with an opaque fill, so the wire shows only between
+   them, and each station keeps its natural width. Shared by the approach figure and the evaluation method. */
+.wl {
+  --tick: 22px;
+  --wire: 1.5px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tick);
+}
+
+.wl::before {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto 0;
+  border-top: var(--wire) solid var(--line-3);
+}
+
+.wl > * {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.wl__st {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-1);
+  background: var(--ink-1);
+  font-size: 0.92rem;
+  font-weight: 540;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.wl__st--answer {
+  border-color: var(--cyan);
+  background: linear-gradient(var(--cyan-soft), var(--cyan-soft)), var(--ink-1);
+  color: var(--text);
+}
+
+/* ---------- The router fork ---------- */
+
+.wl__fork ul {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding-inline: var(--tick);
+  border-inline: var(--wire) solid var(--line-3);
+  background: var(--ink-1);
+}
+
+.wl__fork li {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: 9px 14px;
+  border: 1px dashed var(--line-3);
+  border-radius: var(--r-1);
+  background: var(--ink-1);
+  color: var(--text-3);
+  transition: border-color var(--fast), background var(--fast), color var(--fast), opacity var(--fast);
+}
+
+.wl__fork li::before,
+.wl__fork li::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: var(--tick);
+  border-top: var(--wire) dashed var(--line-3);
+}
+
+.wl__fork li::before { right: 100%; }
+.wl__fork li::after { left: 100%; }
+
+.wl__fork b {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.wl__fork span {
+  font-size: var(--step--1);
+}
+
+/* The route the selected question takes. */
+.ap:has(input[value="overdue"]:checked) [data-route="sql"],
+.ap:has(input[value="paid"]:checked) [data-route="template"],
+.ap:has(input[value="review"]:checked) [data-route="vector"] {
+  border: var(--wire) solid var(--text);
+  background: var(--ink-1);
+  color: var(--text);
+}
+
+.ap:has(input[value="overdue"]:checked) [data-route="sql"]::before,
+.ap:has(input[value="overdue"]:checked) [data-route="sql"]::after,
+.ap:has(input[value="paid"]:checked) [data-route="template"]::before,
+.ap:has(input[value="paid"]:checked) [data-route="template"]::after,
+.ap:has(input[value="review"]:checked) [data-route="vector"]::before,
+.ap:has(input[value="review"]:checked) [data-route="vector"]::after {
+  border-top-style: solid;
+  border-top-color: var(--text);
+}
+
+/* ---------- The loop of the reused runtime ---------- */
+
+/* A fixed width: the loop keeps the same shape whichever question is shown. */
+.wl > .ap__loop {
+  flex: 0 1 720px;
+}
+
+.ap__loop {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border: var(--wire) dashed var(--orange-fill);
+  border-radius: var(--r-2);
+  /* Opaque, so the wire behind the line does not show through the tint. */
+  background: linear-gradient(var(--amber-soft), var(--amber-soft)), var(--ink-1);
+}
+
+/* No answer is claimed for a question outside the recorded run. */
+.ap:has(input[value="review"]:checked) .wl__st--answer {
+  border-style: dashed;
+  border-color: var(--line-3);
+  background: var(--ink-1);
+  color: var(--text-3);
+}
+
+.ap__loop-name {
+  font-size: var(--step--1);
+  font-weight: 560;
+  color: var(--amber);
+}
+
+.ap__run {
+  display: grid;
+  gap: 12px;
+}
+
+.ap__guide {
+  max-width: none;
+  padding: 8px 12px;
+  border-left: 2px solid var(--blue);
+  background: var(--ink-1);
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.ap__guide > span {
+  margin-right: 6px;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.ap__calls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px var(--tick);
+}
+
+.ap__call {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  max-width: 300px;
+  padding: 10px 14px 13px;
+  border: 1px solid var(--blue);
+  border-radius: var(--r-1);
+  background: var(--ink-1);
+}
+
+/* The runtime decides the next call: the wire between calls is the loop's own phantom line. */
+.ap__call + .ap__call::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 1px);
+  width: var(--tick);
+  border-top: 2px solid var(--amber);
+}
+
+.ap__call code {
+  justify-self: start;
+  color: var(--blue);
+}
+
+.ap__call span {
+  font-size: var(--step--1);
+  color: var(--text-2);
+}
+
+/* A call that reads data passes the data guard: the hazard marking used on the guard figure. */
+.ap__call--data::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 5px;
+  border-radius: 0 0 calc(var(--r-1) - 1px) calc(var(--r-1) - 1px);
+  background: repeating-linear-gradient(-45deg, var(--yellow) 0 5px, transparent 5px 10px);
+}
+
+.ap__call--ghost {
+  border-style: dashed;
+  border-color: var(--line-3);
+  background: transparent;
+}
+
+.ap__call--ghost code {
+  color: var(--text-3);
+}
+
+.ap__call--ghost span {
+  color: var(--text-3);
+}
+
+.ap__why {
+  max-width: 72ch;
+  font-size: 0.95rem;
+  color: var(--text-2);
+}
+
+/* ---------- Key ---------- */
+
+.ap__key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: var(--step--1);
+  color: var(--text-2);
+}
+
+.ap__k {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ap__k::before {
+  content: "";
+  width: 16px;
+  height: 11px;
+  border-radius: 3px;
+}
+
+.ap__k--reused::before { border: var(--wire) dashed var(--orange-fill); background: var(--amber-soft); }
+.ap__k--built::before { border: 1px solid var(--blue); background: var(--ink-1); }
+.ap__k--guard::before { background: repeating-linear-gradient(-45deg, var(--yellow) 0 3px, transparent 3px 6px); border: 1px solid var(--line-2); }
+.ap__k--typical::before { border: 1px dashed var(--line-3); }
+
+/* ---------- One question at a time ---------- */
+
+/* Each rule hides the other questions' parts. A browser without :has() drops these rules and shows
+   all three questions one after another, so no content is ever lost. */
+.ap:has(input[value="overdue"]:checked) [data-q]:not([data-q="overdue"]),
+.ap:has(input[value="paid"]:checked) [data-q]:not([data-q="paid"]),
+.ap:has(input[value="review"]:checked) [data-q]:not([data-q="review"]) {
+  display: none;
+}
+
+.ap__notes {
+  margin-top: clamp(44px, 6vw, 72px);
+}
+
+/* ---------- Narrow screens: the lines run downwards ---------- */
+
+@media (max-width: 899px) {
+  .wl {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .wl::before {
+    inset: 0 auto 0 22px;
+    border-top: 0;
+    border-left: var(--wire) solid var(--line-3);
+  }
+
+  .wl__fork,
+  .wl > .ap__loop {
+    flex: none;
+    align-self: stretch;
+  }
+
+  .wl__fork ul {
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .wl__fork li::after {
+    display: none;
+  }
+
+  .ap__call {
+    max-width: none;
+    flex: 1 1 100%;
+  }
+
+  .ap__call + .ap__call::before {
+    display: none;
   }
 }
 
@@ -1081,6 +1802,17 @@
   font-size: 0.98rem;
 }
 
+/* Each control carries an icon in the colour of the enforced path. */
+.controls__ico {
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  border: 1px solid rgba(10, 143, 176, 0.45);
+  border-radius: var(--r-1);
+  background: var(--cyan-soft);
+  color: var(--cyan);
+}
+
 @media (min-width: 700px) {
   .controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1405,45 +2137,38 @@
 
 /* ================= Evaluation ================= */
 
-.method {
+/* The grading method, drawn with the shared wire line and fork. Every branch is taken, so all are solid. */
+.evf {
   display: grid;
-  border-top: 1px solid var(--line);
+  gap: 22px;
+  padding-block: 26px;
+  border-block: 1px solid var(--line);
 }
 
-.method li {
-  display: grid;
-  gap: 8px;
-  align-content: start;
-  padding: 22px 0;
-  border-bottom: 1px solid var(--line);
+.evf .wl__fork li {
+  border-style: solid;
+  border-color: var(--text);
+  color: var(--text);
 }
 
-.method h3 {
-  font-size: 1.04rem;
-  font-stretch: 100%;
+.evf .wl__fork li::before,
+.evf .wl__fork li::after {
+  border-top-style: solid;
+  border-top-color: var(--text);
 }
 
-.method p {
-  font-size: 0.95rem;
+/* Probes are the only branch that reads without the guard: it carries the hazard colour. */
+.evf .wl__fork li:last-child {
+  border-color: var(--amber);
+}
+
+.evf .wl__fork li span {
   color: var(--text-2);
 }
 
-@media (min-width: 640px) {
-  .method {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 40px;
-  }
-}
-
-@media (min-width: 1100px) {
-  .method {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    column-gap: 32px;
-  }
-
-  .method li {
-    border-bottom: 0;
-  }
+/* This line sits on the page, not in a white figure body: the bracket area takes the page colour. */
+.evf .wl__fork ul {
+  background: var(--ink-0);
 }
 
 .bench {
@@ -1692,22 +2417,50 @@
   margin-top: clamp(44px, 6vw, 72px);
 }
 
+/* Open items as empty gauges: a dashed tile with an empty dial, nothing filled in yet. */
 .unproven ul {
   display: grid;
   width: 100%;
-  border-top: 1px solid var(--line);
+  gap: 12px;
 }
 
 .unproven li {
-  padding: 14px 0;
-  border-bottom: 1px solid var(--line);
+  position: relative;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 16px 16px 16px 58px;
+  border: 1px dashed var(--line-3);
+  border-radius: var(--r-2);
+  font-size: 0.92rem;
   color: var(--text-2);
 }
 
-@media (min-width: 900px) {
+.unproven li::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: 26px;
+  height: 26px;
+  border: 2px dashed var(--line-3);
+  border-radius: 50%;
+}
+
+.unproven li strong {
+  display: block;
+  font-size: 0.98rem;
+}
+
+@media (min-width: 700px) {
   .unproven ul {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 48px;
+  }
+}
+
+@media (min-width: 1040px) {
+  .unproven ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

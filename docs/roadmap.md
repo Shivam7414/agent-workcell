@@ -48,6 +48,15 @@ Everything else (TOML, SQLite, CSV, Excel files, HTML cleaning, password hashing
 - Whether the built files open cleanly in Excel and LibreOffice. So far they are checked by reading the XML back and
   with `openpyxl`.
 - Whether word matching is enough for retrieval. The recorded answer run is too small to tell.
+- How much the agent explores. In the recorded run most answers took one query written from the guide in the system
+  prompt: `knowledge` was called once in 10 answers and `get_schema` never. Those questions did not need more steps.
+- Whether the design holds when the guide no longer fits in the system prompt. The reference knowledge has 13 tables.
+  With a large schema the agent would have to find the knowledge through its tools, or a selection step would be
+  needed.
+- Any comparison with a retrieval pipeline. No retrieval baseline exists, so the project claims no difference in
+  accuracy, cost or maintenance effort.
+- Whether a wrong answer to a new kind of question can be fixed in the knowledge files without making other answers
+  worse. It needs the full case set run before and after such a change.
 - Accuracy. It needs all 28 cases, repeated, with a recorded commit:
   `python -m agent_workcell.eval --cases reference_erp/eval_cases.toml --runtime claude --repeats 3 --max-usd N`.
 

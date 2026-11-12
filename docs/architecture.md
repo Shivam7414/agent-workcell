@@ -12,6 +12,11 @@ An agent runtime (a program that runs a model in a loop with tools) is hard to b
 What decides whether its answers over business data are right and safe is everything around it: what it knows, what
 it can touch, and what stops it. Agent Workcell is that surrounding part. The agent runtime is a replaceable piece.
 
+This also moves where the engineering goes. A retrieval pipeline decides in code what context each kind of question
+gets, and it is tuned as new kinds of questions arrive. Here the agent decides, turn by turn, what to look up and which
+query to run, in an environment built for it. The section "Compared with a retrieval pipeline" sets out the
+difference, the retrieval that remains, and what is not proven yet.
+
 ## Principles
 
 1. **One agent per answer, with a small, focused set of tools.** The model sees the whole question. No intent
@@ -23,6 +28,64 @@ it can touch, and what stops it. Agent Workcell is that surrounding part. The ag
 5. **Knowledge is data, checked against the real system.** A test fails when the system changes and the knowledge
    does not.
 6. **Measure before adding.** No new layer without a benchmark result that asks for it.
+
+## Compared with a retrieval pipeline
+
+A common way to answer questions over business data is retrieval-augmented generation (RAG): code selects context
+for the question, and the model writes the answer from it. Over documents this usually means chunking, embeddings,
+vector search with metadata filters, a top-k setting and reranking. Over a database it often means a text-to-SQL
+pipeline with schema retrieval, retrieval of example queries, and a router that sends each kind of question down its
+own path. Each stage has settings, and a setting tuned for one kind of question can make another worse. Many such
+systems work well. For large bodies of free text, retrieval is the right tool, and this project offers no
+alternative there.
+
+This project splits the work differently. One reused agent runtime reads the whole question, decides what to look up,
+runs a query, reads the result and decides again. The engineering goes into what it works in: a checked description
+of the data, five tools, and a database that decides access.
+
+| Concern | A typical retrieval pipeline | This project |
+|---|---|---|
+| Who chooses the context | Code, for each question: top-k, filters, reranking | The role's whole data guide goes with every question. The agent asks for more with `knowledge` and `get_schema` when it decides to |
+| Counts and totals | Retrieved passages hold a few rows; a count needs all of them, so such questions need their own path | The agent writes SQL. The database computes over every row the person may read |
+| Relationships between records | Joined into documents before indexing, or written into a query template per kind of question | Links are data in the knowledge graph. `knowledge` adds the join path between the tables a question names and refuses a path that multiplies rows |
+| The words people use | Synonym lists in the index, or embeddings that place similar words close together | Aliases and screen words, written in the knowledge files and checked against the database |
+| A new kind of question | Often a new route, template or setting, then a check that older questions still work | The same agent and tools. When an answer is wrong, the fix is meant to go into the knowledge: an alias, a rule or a calculation (**to verify**) |
+| Access | A filter in the retriever, applied by code | Grants and views in the database (see "The data guard") |
+| What is tuned | Chunk size, embedding model, top-k, reranker, a prompt per route | The knowledge files, the tools' results and error messages, one system prompt |
+
+### The retrieval that remains
+
+There is no chunking, no embedding, no vector search and no reranking anywhere in the project. Knowledge and data
+still reach the model in three ways, and each of them is a form of retrieval:
+
+- **The guide in every request.** The role's generated guide is part of the system prompt. Nothing is selected: the
+  whole guide goes every time. This works because the reference knowledge is small (13 tables). The guide grows with
+  the schema, and a large schema will not fit (see "Open questions").
+- **The `knowledge` tool.** Keyword retrieval: whole-word matching against names, aliases, screen words and
+  calculation names, plus a join-path search in code (see "Retrieval"). Its rules, such as which common words may
+  select a table and which paths are refused, are hand-made heuristics, like the settings of any retrieval stage.
+- **SQL written by the agent.** The data itself is fetched by queries the model writes. They are exact and run
+  through the guard, but a wrong query still gives a wrong answer.
+
+The engineering effort does not disappear; it moves. People write and maintain the knowledge files, and a missing
+alias, a wrong rule or a stale description still leads to wrong answers. The check keeps names true; it cannot keep
+descriptions true. The system prompt also carries fixed working instructions.
+
+### What the recorded run shows
+
+In the one recorded answer run (2026-11-11, `claude-opus-5-5`, 10 answers; see "Recorded results"), the agent made
+13 tool calls: 11 `run_query`, 1 `create_file`, 1 `knowledge` and no `get_schema`, with 2.3 turns per answer on
+average. Most answers took one query, written from the guide in the system prompt. Two answers show steps the agent
+chose itself: a second query to check that a join had dropped no overdue invoice, and a search of the suppliers table
+for the buying company's name.
+
+One case shows the limit of the keyword lookup. For "How much has actually been paid on invoice 5100000170?",
+`knowledge` returns only `supplier_invoices`, matched through the screen word "Paid"; it does not return `payments` or
+`payment_allocations`. The agent did not call it. It wrote the right join from the guide.
+
+The run therefore shows that the agent can answer from this environment. It does not show deep multi-step
+exploration, because these questions did not need it, and it does not compare the design with a retrieval pipeline.
+Both are **to verify**; see [roadmap.md](roadmap.md).
 
 ## The parts
 
@@ -237,7 +300,8 @@ its tables. The guide is sent with every request. It is generated, never edited 
 ### Retrieval
 
 `Retriever(graph, policy, role).find(question)` returns the knowledge one question needs; `python -m
-agent_workcell.knowledge find --role buyer "invoices in review"` shows it. There is no vector database: the knowledge
+agent_workcell.knowledge find --role buyer "invoices in review"` shows it. The `knowledge` tool calls it. It adds
+detail to the guide, which the model already has; it does not replace it. There is no vector database: the knowledge
 is small enough to send a guide with every request, and business questions are full of names that word matching
 handles well.
 
@@ -255,7 +319,8 @@ handles well.
 
 **To verify:** whether word matching finds what real questions need. Its limits are known: a word that is neither a
 name, an alias nor a screen word is not found; a bare number such as `4500000123` does not point to a table on its
-own. The benchmark (see "Evaluation") is where this will show; the recorded run is too small to tell.
+own; a word that is a stored value of one table can stand for another table ("paid" selects invoices with the status
+Paid, not payments). The benchmark (see "Evaluation") is where this will show; the recorded run is too small to tell.
 
 ## The tool server
 
@@ -494,7 +559,7 @@ The full case file with repeats is ready to run; see [roadmap.md](roadmap.md) ("
 | Left out | Why |
 |---|---|
 | Intent classifiers, routers, multi-agent hand-offs | They split the meaning of one question across stages |
-| Vector database | The knowledge is small and questions are full of identifiers |
+| Chunking, embeddings, vector search, reranking | The reference knowledge is small enough to send whole, and questions are full of identifiers. To revisit when a benchmark shows that word matching or the size of the guide is the problem |
 | Letting the agent read the host application's source | Host-specific, and it widens what an injected instruction can reach |
 | Reports where the model types the numbers | The server runs the SQL and writes the file; the model never retypes data |
 | A spreadsheet library | An `.xlsx` with text, number and date cells is a few XML parts; the standard library writes them |
@@ -520,5 +585,9 @@ Still open:
   `openpyxl`).
 - Whether word matching is enough for retrieval. The first small benchmark run gave no sign against it, but 7
   graded answers cannot show it.
+- What happens when the guide no longer fits in the system prompt. The agent would then have to find the knowledge
+  through `get_schema` and `knowledge`, or a selection step (retrieval) would be needed. Not tested: the reference
+  knowledge has 13 tables.
+- How the design compares with a retrieval pipeline on the same cases. No retrieval baseline exists.
 - Which technique to ship for MariaDB and MySQL.
 - Per-role column visibility.

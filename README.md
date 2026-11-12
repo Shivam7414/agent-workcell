@@ -18,6 +18,35 @@ agent loop on top of a raw model API. It takes an existing agent runtime and bui
 | Audit | Every answer stored with the exact queries behind it. |
 | Evaluation | Benchmarks with answers checked against the database, and permission probes. |
 
+## How it differs from a retrieval pipeline
+
+A common way to answer questions over business data is a retrieval pipeline (RAG): code chooses the context for each
+question with chunking, embeddings, vector search, filters, top-k and reranking, often with a router in front that
+sends each kind of question down its own path. A setting that helps one kind of question can hurt another, so the
+pipeline is tuned again as new questions arrive. Many such systems work well, and for large bodies of free text
+retrieval is the right tool.
+
+Agent Workcell tries a different split for structured business data. The agent decides what to look up and which
+query to run; the project engineers what it works in. For example, "How many invoices for my orders are overdue?":
+
+- the buyer's data guide, sent with every question, holds the rule that defines "overdue";
+- the agent writes one SQL count, and the database counts every row this buyer may read, not a top-k sample;
+- the database, not a filter in the retriever, decides which rows those are.
+
+What it still relies on, stated plainly:
+
+- **No** chunking, embeddings, vector search or reranking.
+- The role's **whole data guide** goes in the system prompt with every question. That works for the 13 tables of the
+  reference ERP; a much larger schema would not fit.
+- A **keyword lookup** tool (`knowledge`) matches the words of a question against names, aliases and screen words and
+  adds join paths. It is retrieval by words, with hand-made rules.
+- **People maintain the knowledge files** (aliases, screen words, rules, calculations), and there is one fixed system
+  prompt. The engineering work moves into the knowledge; it does not disappear.
+
+Not proven yet: that the agent explores well when the guide is not enough, and any difference in accuracy, cost or
+maintenance against a retrieval pipeline. No retrieval baseline has been run. Details in
+[docs/architecture.md](docs/architecture.md), "Compared with a retrieval pipeline".
+
 ## Status
 
 **Early stage, not independently reviewed.** Do not use it with production data. [docs/roadmap.md](docs/roadmap.md)
@@ -30,7 +59,7 @@ What exists:
   runs one read-only query as one person. An attack suite compares every hostile query with an independent oracle;
 - the **knowledge graph**: what each table, column and stored value means, with calculations and business rules. A
   check compares it with the live database, and a guide is generated for each role that lists only what that role
-  can read;
+  can read. A keyword lookup finds the tables, values and join paths a question names;
 - the **answer server**: an API for the host application, a tool server over MCP whose tools act as the person who
   asked, a Claude adapter that removes Claude Code's own shell, file and web tools, limits per answer and per person,
   and an audit record of every answer and query;

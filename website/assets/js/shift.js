@@ -18,7 +18,7 @@ const BLOCKS = [
   { a: "Intent detection", kind: "drop", to: [1.4, 4.7], tag: [-34, 36] },
   { a: "Routing", kind: "drop", to: [3.1, 4.0], tag: [34, 34] },
   { a: "Context management", kind: "runtime", level: 0 },
-  { a: "Business context", b: "Knowledge graph", kind: "env", to: [-4.3, 0.9], tag: [-58, -34] },
+  { a: "Retrieval pipeline", b: "Knowledge graph", kind: "env", to: [-4.3, 0.9], tag: [-58, -34] },
   { a: "Tool orchestration", kind: "runtime", level: 1 },
   { a: "Access control", b: "Data guard", kind: "env", to: [-0.9, -4.3], tag: [52, -36] },
   { a: "Multi-step execution", kind: "runtime", level: 2 },

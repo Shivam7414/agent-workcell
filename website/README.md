@@ -42,7 +42,7 @@ and `assets/js/lib/dom.js`.
 | `assets/js/scene.js` | The workcell scene, used by the hero (`play`) and the architecture section (`explore`) |
 | `assets/js/shift.js` | The scroll-driven scene of the "Idea" section |
 | `assets/js/lib/wires.js` | Connectors between HTML elements, for the knowledge figure |
-| `assets/js/*.js` | One module for each remaining figure |
+| `assets/js/*.js` | One module for each remaining interactive figure. The comparison figure (Fig. 1) and the evaluation flow need no script: Fig. 1 switches questions with CSS `:has()`, and without it shows all three questions in turn. |
 | `assets/fonts/` | Archivo and Martian Mono, with their licences (SIL Open Font License) |
 
 ## Rules

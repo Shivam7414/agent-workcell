@@ -73,7 +73,8 @@ export const PARTS = {
     facts: [
       "A check compares the files with the live database.",
       "Each role gets a generated guide of what it can read.",
-      "Retrieval matches words. There is no vector database.",
+      "The guide goes with every question. A keyword lookup adds detail.",
+      "No embeddings and no vector search.",
     ],
     code: ["src/agent_workcell/knowledge/", "reference_erp/knowledge/"],
     tests: ["tests/unit/test_knowledge_graph.py", "tests/integration/test_knowledge_check.py"],
