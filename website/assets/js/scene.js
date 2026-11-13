@@ -294,14 +294,15 @@ export function createCell(canvas, { mode = "play", onStep, onSelect } = {}) {
       });
     });
 
-    // Tool rack: five tools, and nothing else in reach.
+    // Tool rack: seven tools, and nothing else in reach. The fourth sits where the arm picks a tool (AT.rack).
     part(4, "tools", () => {
       stage.box(2.5, -3.75, 0, 0.8, 2.75, 0.75, C.steel);
-      for (let i = 0; i < 5; i++) {
-        if (i === 2 && holdTool) {
-          stage.poly([[2.69, -2.62, 0.75], [3.11, -2.62, 0.75], [3.11, -2.2, 0.75], [2.69, -2.2, 0.75]], "rgba(11,13,18,0.12)", null);
+      for (let i = 0; i < 7; i++) {
+        const y = -3.68 + i * 0.37;
+        if (i === 3 && holdTool) {
+          stage.poly([[2.74, y, 0.75], [3.06, y, 0.75], [3.06, y + 0.32, 0.75], [2.74, y + 0.32, 0.75]], "rgba(11,13,18,0.12)", null);
         } else {
-          stage.box(2.69, -3.66 + i * 0.52, 0.75, 0.42, 0.42, 0.42, i === 2 ? C.cyan : C.blue);
+          stage.box(2.74, y, 0.75, 0.32, 0.32, 0.32, i === 3 ? C.cyan : C.blue);
         }
       }
     });
@@ -372,7 +373,7 @@ export function createCell(canvas, { mode = "play", onStep, onSelect } = {}) {
       joint(stage, arm.elbow, 0.25);
       const [gx, gy, gz] = arm.tip;
       if (holdRow) stage.box(gx - 0.6, gy - 0.38, gz - 0.42, 1.2, 0.75, 0.2, C.cyan);
-      if (holdTool) stage.box(gx - 0.21, gy - 0.21, gz - 0.22, 0.42, 0.42, 0.42, C.cyan);
+      if (holdTool) stage.box(gx - 0.16, gy - 0.16, gz - 0.22, 0.32, 0.32, 0.32, C.cyan);
       else stage.box(gx - 0.14, gy - 0.14, gz - 0.2, 0.28, 0.28, 0.2, "#2a2f3b");
       joint(stage, arm.tip, 0.17);
     });

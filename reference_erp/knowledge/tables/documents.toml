@@ -1,0 +1,40 @@
+table = "documents"
+record = "One document kept in the system: a company policy, an agreement with a supplier, or a file that belongs to one purchase order. Its file and text are in document_versions and document_chunks."
+aliases = ["document", "attachment", "file"]
+
+[columns.id]
+description = "Internal number of the document. Its versions link to it."
+
+[columns.doc_number]
+description = "The document number people use, such as D-000012. Not the id."
+aliases = ["document number", "doc number"]
+
+[columns.title]
+description = "Title of the document, as shown in the document list."
+
+[columns.kind]
+description = "What sort of document it is."
+aliases = ["document type"]
+values = { company_policy = "Company Policy", budget_plan = "Budget Plan", supply_agreement = "Supply Agreement", supplier_evaluation = "Supplier Evaluation", order_terms = "Delivery Terms", quote_comparison = "Quote Comparison", quality_certificate = "Quality Certificate" }
+
+[columns.audience]
+description = "Who the document is meant for. Shared with Supplier means the users of the document's supplier may read it too."
+values = { admins = "Admins Only", staff = "Internal", supplier = "Shared with Supplier" }
+
+[columns.supplier_id]
+description = "The supplier the document is about. Empty for company documents."
+link = "suppliers.id"
+
+[columns.purchase_order_id]
+description = "The order the document belongs to. Empty for documents that do not belong to one order."
+link = "purchase_orders.id"
+
+[columns.created_by]
+description = "The person who added the document. A user id with no foreign key."
+link = "users.id"
+
+[columns.created_at]
+description = "When the document was added."
+
+[columns.deleted_at]
+description = "When the document was deleted in the application. Empty for documents that were not deleted."

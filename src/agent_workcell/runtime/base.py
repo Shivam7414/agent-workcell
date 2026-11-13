@@ -21,7 +21,11 @@ class RunRequest:
     model: str
     max_turns: int
     max_usd: float
-    workdir: Path  # an empty folder for this run, outside any project
+    workdir: Path  # the person's own folder, outside any project; it holds the runtime's sessions
+    # The conversation's session, chosen by the server (a UUID): started when `resume` is False, continued when True.
+    # Never taken from the model or the browser. None runs without a named session.
+    session_id: str | None = None
+    resume: bool = False
 
 
 @dataclass(frozen=True)

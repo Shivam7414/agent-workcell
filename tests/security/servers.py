@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import uvicorn
 
 from agent_workcell.config import Settings
+from agent_workcell.documents.store import DEFAULT_DOCUMENT_NAMES, DocumentNames
 from agent_workcell.runtime import FakeRuntime
 from agent_workcell.server import build_service, create_app
 from reference_erp import seed
@@ -43,13 +44,15 @@ def serving(app, port: int) -> Iterator[str]:
 
 
 @contextmanager
-def answer_server(guard_db, data_dir: Path) -> Iterator[SimpleNamespace]:
-    """The answer server with the fake runtime, on the guarded test database."""
+def answer_server(guard_db, data_dir: Path, document_names: DocumentNames = DEFAULT_DOCUMENT_NAMES,
+                  embedder=None, **overrides) -> Iterator[SimpleNamespace]:
+    """The answer server with the fake runtime, on the guarded test database. `overrides` are Settings fields."""
     port = free_port()
     settings = Settings(policy=POLICY_PATH, knowledge=KNOWLEDGE, agent_url=guard_db.agent_url,
                         binder_url=guard_db.binder_url, host_key=HOST_KEY, data_dir=data_dir, port=port,
-                        runtime="fake", answer_timeout_s=30, today=seed.ANCHOR_DATE)
-    service = build_service(settings, FakeRuntime([]), names=NAMES)
+                        runtime="fake", answer_timeout_s=30, today=seed.ANCHOR_DATE, **overrides)
+    service = build_service(settings, FakeRuntime([]), names=NAMES, document_names=document_names,
+                            embedder=embedder)
     try:
         with serving(create_app(service), port) as url:
             yield SimpleNamespace(service=service, url=url, settings=settings)
@@ -57,3 +60,4 @@ def answer_server(guard_db, data_dir: Path) -> Iterator[SimpleNamespace]:
         service.audit.close()
         service.memory.close()
         service.files.close()
+        service.conversations.close()

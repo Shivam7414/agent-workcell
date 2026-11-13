@@ -1,6 +1,6 @@
 # Status and plans
 
-This page says what exists today, what has not been proven yet, and what is planned. A part counts as existing only
+This page says what exists today, what is not proven, and what is planned. A part counts as existing only
 when its tests are in the repository and pass. The design and its reasons are in [architecture.md](architecture.md).
 
 ## What exists
@@ -11,13 +11,17 @@ when its tests are in the repository and pass. The design and its reasons are in
 | Policy file and loader | `src/agent_workcell/policy.py` | `tests/unit/test_policy.py` |
 | Data guard for PostgreSQL: install SQL (`guard plan`), start-up check (`guard doctor`), guarded connection | `src/agent_workcell/guard/`, `python -m agent_workcell.guard plan / doctor / apply` (`apply` is for local development only) | `tests/unit/test_plan.py`; `tests/security/`: attack suite against an independent oracle, parity per person and table, identity, limits, doctor |
 | Knowledge graph: data files, check against the live database, generated guide per role, retrieval | `src/agent_workcell/knowledge/`, `reference_erp/knowledge/` (13 tables, 5 calculations, 12 rules) | `tests/unit/test_knowledge_graph.py`, `test_retrieve.py`, `tests/integration/test_knowledge_check.py` |
-| Tools over MCP: `knowledge`, `get_schema`, `run_query`, `create_file`, `remember` | `src/agent_workcell/tools.py`, `tool_server.py` | `tests/security/test_answer_server.py` |
+| Tools over MCP: `knowledge`, `get_schema`, `run_query`, `create_file`, `remember`, `search_documents`, `read_document` | `src/agent_workcell/tools.py`, `tool_server.py` | `tests/security/test_answer_server.py`, `test_document_tools.py` |
 | Runtime interface, fake runtime, Claude adapter with its hardening profile | `src/agent_workcell/runtime/` | `tests/unit/test_runtime_and_prompt.py`; `tests/runtime_conformance/` (by hand, calls a model) |
 | Answer server: host-key API, streamed answers, per-answer and per-person limits, audit | `src/agent_workcell/server.py`, `prompt.py`, `audit.py`, `config.py` | `tests/security/test_answer_server.py`, `tests/unit/test_runtime_and_prompt.py` |
+| Conversations: follow-up questions resume the person's own Claude Code session | `src/agent_workcell/conversations.py`, `server.py`, `runtime/claude.py` | `tests/security/test_conversations.py`; `tests/runtime_conformance/` (by hand) |
 | Files (CSV and Excel built by the server), memory notes, cleaned answer HTML | `src/agent_workcell/files.py`, `memory.py`, `render.py` | `tests/unit/test_files.py`, `test_memory.py`, `test_render.py` |
 | Reference host application: sign-in, signed session, chat page | `reference_erp/host_app/`, `python -m reference_erp.host_app` | `tests/security/test_host_app.py` |
 | Evaluation: 28 cases (22 with gold SQL, 6 permission probes), graders in plain code, harness | `reference_erp/eval_cases.toml`, `src/agent_workcell/eval/`, `python -m agent_workcell.eval` | `tests/unit/test_eval_grade.py`, `tests/security/test_eval_harness.py` |
+| Documents: embeddings (OpenAI, OpenRouter, a free fake one) and hybrid search by words and meaning through the guard | `src/agent_workcell/documents/embed.py`, `search.py`, `document_chunk_embeddings` | `tests/unit/test_documents_embed.py`, `tests/security/test_document_search.py`; `tests/embedding_conformance/` (by hand, calls a provider) |
 | Guard latency benchmark | `bench/guard_latency/run.py` | Results in `bench/results/` |
+| Documents: upload, job queue with retries and status, the documents role and its check, reading text, Markdown and CSV into passages | `src/agent_workcell/documents/`, `POST /v1/documents/{id}/versions`, `python -m agent_workcell.documents plan / apply / check / work` | `tests/unit/test_documents_read.py`, `tests/security/test_document_processing.py` |
+| Documents: tables, access rules and made-up data for the reference ERP | `reference_erp/documents.sql`, `seed.py`, `policy.toml`, `reference_erp/knowledge/tables/document_*.toml` | `tests/unit/test_seed_data.py`; `tests/security/test_documents.py`, `test_attack_suite.py`, `test_parity.py` |
 
 ## Dependencies and why
 
@@ -27,6 +31,7 @@ when its tests are in the repository and pass. The design and its reasons are in
 | `mcp` | The official MCP SDK. The tool server must speak standard MCP, and the protocol is too large to write by hand safely. |
 | `starlette`, `uvicorn`, `anyio` | The web stack `mcp` already uses. Listed because the project imports them. |
 | `httpx2` | The HTTP client `mcp` already installs. The reference host application and the evaluation harness call the answer API with it. |
+| pgvector (in the database image, not a Python package) | Vectors and cosine distance inside PostgreSQL, so document search stays behind the data guard. Compose uses `pgvector/pgvector:pg17-trixie`, which has the same C library as `postgres:17`, so an existing data volume keeps valid text indexes. |
 | `claude-agent-sdk` (optional `claude` extra, pinned) | The agent runtime the project reuses. Pinned because the hardening profile is checked against one version. |
 
 Everything else (TOML, SQLite, CSV, Excel files, HTML cleaning, password hashing) uses the standard library.
@@ -40,15 +45,15 @@ Everything else (TOML, SQLite, CSV, Excel files, HTML cleaning, password hashing
 - **Runtime conformance:** run in the Claude Code sign-in mode. See [architecture.md](architecture.md), "The agent
   runtime".
 
-## Not proven yet (to verify)
+## Not proven (to verify)
 
 - The Claude adapter's isolated mode against the real runtime: no account details reach the model, and no transcript
   is left outside the run's folder. These checks need an API key.
 - Whether the model always uses the date in `<today>` rather than the real date the runtime adds.
 - What one Claude Code CLI process per answer costs: start-up time, memory and CPU, and how many answers one server can
-  run at once. Not measured. Whether the runtime's requests use the provider's prompt cache for the system prompt is
-  also unchecked.
-- Whether the built files open cleanly in Excel and LibreOffice. So far they are checked by reading the XML back and
+  run at once. Not measured. Claude Code uses the provider's prompt cache by default; the audit does not record cache
+  tokens, so the saving is not measured.
+- Whether the built files open cleanly in Excel and LibreOffice. They are checked by reading the XML back and
   with `openpyxl`.
 - Whether word matching is enough for retrieval. The recorded answer run is too small to tell.
 - How much the agent explores. In the recorded run most answers took one query written from the guide in the system
@@ -60,6 +65,12 @@ Everything else (TOML, SQLite, CSV, Excel files, HTML cleaning, password hashing
   accuracy, cost or maintenance effort.
 - Whether a wrong answer to a new kind of question can be fixed in the knowledge files without making other answers
   worse. It needs the full case set run before and after such a change.
+- How fast document search is on a large set of documents. It compares every candidate passage exactly; no
+  approximate vector index is used.
+- Whether merging words and meaning (reciprocal rank fusion, constant 60) finds better passages than either alone.
+  There is no document benchmark.
+- How well the agent answers questions about documents, and whether its citations match the passages it read. No
+  answer run covers documents.
 - Accuracy. It needs all 28 cases, repeated, with a recorded commit:
   `python -m agent_workcell.eval --cases reference_erp/eval_cases.toml --runtime claude --repeats 3 --max-usd N`.
 
@@ -67,7 +78,7 @@ Everything else (TOML, SQLite, CSV, Excel files, HTML cleaning, password hashing
 
 | Item | Notes |
 |---|---|
-| Docker Compose services for the answer server and the reference host application | Today they run with Python next to the Compose database. Goal: `docker compose up` gives PostgreSQL, the reference ERP and the assistant, and three roles can sign in and ask. |
+| Docker Compose services for the answer server, the document worker and the reference host application | Today they run with Python next to the Compose database. Goal: `docker compose up` gives PostgreSQL, the reference ERP and the assistant, and three roles can sign in and ask. |
 | A first release | After the item above and a recorded benchmark run with a commit |
 | A fact in the reference knowledge that the ERP belongs to Meridian Works | The recorded run showed a supplier user's answer hedging because the model did not know it |
 | MariaDB and MySQL guard | Needs its own lab that passes the same attack suite; the technique is open (see [architecture.md](architecture.md)) |

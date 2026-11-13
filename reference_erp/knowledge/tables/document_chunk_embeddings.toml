@@ -1,0 +1,19 @@
+table = "document_chunk_embeddings"
+record = "A vector of one passage's meaning, made by one embedding model. Document search uses it to find passages that say the same thing in other words."
+aliases = ["embedding"]
+
+[columns.id]
+description = "Internal number of the embedding."
+
+[columns.document_version_id]
+description = "The version of the document the passage belongs to."
+link = "document_versions.id"
+
+[columns.chunk_no]
+description = "The passage's number within its version. With document_version_id, it names one row of document_chunks."
+
+[columns.model]
+description = "The embedding model that made the vector. Vectors of different models cannot be compared."
+
+[columns.embedding]
+description = "The vector itself: a long list of numbers with no meaning to people. Do not select it."

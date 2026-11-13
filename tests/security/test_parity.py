@@ -56,3 +56,26 @@ def test_the_suite_catches_a_policy_that_is_too_wide(guard_db, oracle_db):
             install(conn, guard_db.policy, AGENT_PASSWORD, BINDER_PASSWORD, NAMES)
         guard_db.close()
     assert guard_outcome(guard_db, "buyer", query) == oracle_db("buyer", query)
+
+
+def test_the_suite_catches_a_document_rule_that_forgets_the_audience(guard_db, oracle_db):
+    """Drop the audience condition from the supplier rules of versions, chunks and embeddings. Internal documents
+    about a supplier, and documents of orders not yet sent, would then reach that supplier. The comparison must see
+    it."""
+    text = POLICY_PATH.read_text(encoding="utf-8")
+    wide = text.replace("WHERE d.audience = 'supplier' AND d.supplier_id = {supplier_id}",
+                        "WHERE d.supplier_id = {supplier_id}")
+    assert wide.count("WHERE d.supplier_id = {supplier_id}") == 3
+    query = "SELECT id, content FROM document_chunks"
+    people = ["supplier_big", "supplier_small"]
+    try:
+        with psycopg.connect(guard_db.owner_url) as conn:
+            install(conn, parse_policy(wide), AGENT_PASSWORD, BINDER_PASSWORD, NAMES)
+        guard_db.close()
+        assert any(guard_outcome(guard_db, label, query) != oracle_db(label, query) for label in people)
+    finally:
+        with psycopg.connect(guard_db.owner_url) as conn:
+            install(conn, guard_db.policy, AGENT_PASSWORD, BINDER_PASSWORD, NAMES)
+        guard_db.close()
+    for label in people:
+        assert guard_outcome(guard_db, label, query) == oracle_db(label, query)

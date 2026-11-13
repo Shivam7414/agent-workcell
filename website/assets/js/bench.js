@@ -4,7 +4,7 @@
 import { CASES, LATENCY } from "./data.js";
 import { el } from "./lib/dom.js";
 
-const KIND = { ok: "graded, correct", probe: "probe, no violation", none: "not run yet" };
+const KIND = { ok: "graded, correct", probe: "probe, no violation", none: "not run" };
 
 export function initBench(root) {
   const grid = root.querySelector("[data-bench-cases]");

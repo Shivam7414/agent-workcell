@@ -73,6 +73,13 @@ def test_links_point_to_rows_that_exist(tables):
         ("payments", "supplier_id", "suppliers"),
         ("payment_allocations", "payment_id", "payments"),
         ("payment_allocations", "supplier_invoice_id", "supplier_invoices"),
+        ("documents", "supplier_id", "suppliers"),
+        ("documents", "purchase_order_id", "purchase_orders"),
+        ("documents", "created_by", "users"),
+        ("document_versions", "document_id", "documents"),
+        ("document_versions", "uploaded_by", "users"),
+        ("document_chunks", "document_version_id", "document_versions"),
+        ("document_chunk_embeddings", "document_version_id", "document_versions"),
     ]
     for table, column, parent in links:
         for row in as_dicts(tables, table):
@@ -154,6 +161,43 @@ def test_the_traps_are_in_the_data(tables):
     assert any(invoice["purchase_order_id"] is None for invoice in as_dicts(tables, "supplier_invoices"))
     assert any(line["discount_pct"] is None for line in as_dicts(tables, "purchase_order_lines"))
     assert any(line["tax_rate"] is None for line in as_dicts(tables, "purchase_order_lines"))
+
+
+def test_a_document_of_an_order_belongs_to_the_orders_supplier(tables):
+    supplier_of = {order["id"]: order["supplier_id"] for order in as_dicts(tables, "purchase_orders")}
+    documents = as_dicts(tables, "documents")
+    for document in documents:
+        if document["purchase_order_id"]:
+            assert document["supplier_id"] == supplier_of[document["purchase_order_id"]], document["doc_number"]
+        if document["audience"] == "supplier":
+            assert document["supplier_id"] is not None, document["doc_number"]
+
+
+def test_only_ready_versions_have_chunks_and_only_failed_ones_have_an_error(tables):
+    versions = {version["id"]: version for version in as_dicts(tables, "document_versions")}
+    with_chunks = {chunk["document_version_id"] for chunk in as_dicts(tables, "document_chunks")}
+    assert with_chunks == {vid for vid, version in versions.items() if version["status"] == "ready"}
+    for version in versions.values():
+        assert (version["error"] is not None) == (version["status"] == "failed")
+
+
+def test_the_document_traps_are_in_the_data(tables):
+    orders = {order["id"]: order for order in as_dicts(tables, "purchase_orders")}
+    documents = as_dicts(tables, "documents")
+    versions = as_dicts(tables, "document_versions")
+    chunks = as_dicts(tables, "document_chunks")
+    assert any(d["audience"] == "admins" for d in documents)
+    # Internal documents about one supplier, which that supplier must not see
+    assert any(d["audience"] == "staff" and d["supplier_id"] for d in documents)
+    # Documents shared with a supplier, on an order that was never sent to them
+    assert any(d["audience"] == "supplier" and d["purchase_order_id"]
+               and orders[d["purchase_order_id"]]["status"] not in ("sent", "partially_received", "received", "closed")
+               for d in documents)
+    assert any(d["deleted_at"] for d in documents)
+    assert any(v["version_no"] > 1 for v in versions)
+    assert {"failed", "pending"} <= {v["status"] for v in versions}
+    # Text a supplier wrote into a certificate: every kind of hostile text, in one passage
+    assert any(all(note in c["content"] for note in seed.HOSTILE_NOTES) for c in chunks)
 
 
 def test_scale_must_be_positive():

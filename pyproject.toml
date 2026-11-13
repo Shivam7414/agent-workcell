@@ -52,6 +52,7 @@ select = ["E", "F", "I", "B", "UP", "S608"]
 [tool.pytest.ini_options]
 # tests/runtime_conformance calls a real model and costs money. It runs only by hand:
 #   pytest tests/runtime_conformance
+# tests/embedding_conformance calls a real embedding provider. By hand only, the same way.
 testpaths = ["tests/unit", "tests/integration", "tests/security"]
 pythonpath = ["."]
 markers = [

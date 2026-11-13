@@ -123,6 +123,18 @@ def test_the_principal_comes_from_the_session_and_never_from_the_browser(apps, g
     assert visible < len(guard_db.tables["purchase_orders"])
 
 
+def test_the_page_continues_its_conversation_and_a_bad_conversation_id_is_refused(apps, guard_db):
+    server, url = apps
+    runtime = FakeRuntime([COUNT_ORDERS])
+    server.service.runtime = runtime
+    client = sign_in(url, user(guard_db, "buyer")["email"])
+    ask(client, {"question": "How many orders?", "conversation_id": "page-1"})
+    ask(client, {"question": "And last month?", "conversation_id": "page-1"})
+    first, second = runtime.requests
+    assert second.session_id == first.session_id and second.resume and not first.resume
+    assert client.post("/api/ask", json={"question": "Hi", "conversation_id": "../x"}).status_code == 400
+
+
 def test_a_changed_forged_or_expired_session_is_refused(apps, guard_db):
     _, url = apps
     client = sign_in(url, user(guard_db, "buyer")["email"])

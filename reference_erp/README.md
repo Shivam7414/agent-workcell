@@ -18,6 +18,7 @@ Flow: **Purchase order → Goods receipt → Supplier invoice → Payment**
 | `supplier_invoices`, `supplier_invoice_lines` | A supplier's bill, and what is on it |
 | `payments`, `payment_allocations` | Money sent to a supplier, and which invoices it pays |
 | `audit_log` | Internal log of approvals and reviews |
+| `documents`, `document_versions`, `document_chunks`, `document_chunk_embeddings` | A document (a policy, an agreement, a file of one order), each uploaded file of it, passages of the file's text with their page and section, and an embedding of each passage |
 
 ## Roles
 
@@ -26,6 +27,11 @@ Flow: **Purchase order → Goods receipt → Supplier invoice → Payment**
 | `admin` | Meridian Works staff | Everything |
 | `buyer` | Meridian Works staff | Only the orders they own, and the records linked to them. No payments. |
 | `supplier_user` | Works for one supplier | Only their own supplier's orders (once sent), invoices and payments |
+
+Documents have their own audience. `admins` documents are for admins only. Buyers read internal (`staff`) and
+shared (`supplier`) documents, except those of other buyers' orders. A supplier user reads only documents shared
+with their own supplier, and a document of an order only once that order has been sent. Versions and passages follow
+their document.
 
 The data guard enforces these rules. They are written as a policy in `policy.toml`. Install it with
 `python -m agent_workcell.guard apply` (see the main README).
@@ -53,7 +59,10 @@ system.
 | Received is not accepted | Accepted quantity is `quantity_received - quantity_rejected` |
 | A link whose target changes | `audit_log.entity_id` points to a different table depending on `entity_type` |
 | Sensitive columns | `users.password_hash`, `suppliers.tax_id`, `suppliers.bank_account` |
-| Hostile text in records | A few `purchase_orders.notes` hold prompt-injection text, a spreadsheet formula, an image tag and a link (`HOSTILE_NOTES` in `seed.py`) |
+| Hostile text in records | A few `purchase_orders.notes` hold prompt-injection text, a spreadsheet formula, an image tag and a link (`HOSTILE_NOTES` in `seed.py`). A few quality certificates, written by suppliers, carry the same text in a passage. |
+| A document about a supplier that the supplier must not see | Supplier evaluations are internal (`audience = 'staff'`) but carry the supplier's id |
+| A shared document whose order was never sent | A document shared with the supplier, on an order the supplier has not received; the supplier must not see it |
+| Several versions of one document | The current version is the highest `version_no` whose status is `ready`. Failed and waiting versions have no passages. |
 
 ## Loading the data
 
@@ -66,7 +75,11 @@ python -m reference_erp.seed --reset         # empty the reference ERP tables fi
 The same `--seed` and `--scale` always give the same rows. Nothing reads the clock: "today" in the data is
 `ANCHOR_DATE` (2026-06-30), and every date is counted back from it. Tests and benchmarks must use that date as today.
 
-`seed.py` makes the tables when they are missing, and refuses to add rows to tables that already have some.
+`seed.py` makes the tables when they are missing, and refuses to add rows to tables that already have some. The
+document tables are in their own file, `documents.sql`, which `seed.py` also runs on a database that has the other
+tables but not these. Documents are generated after every other row, and an order gets one by its id, so they did
+not change any other row. The seeded passages carry embeddings of the free `fake` model, so search by meaning works
+with no provider.
 
 ## The chat page
 

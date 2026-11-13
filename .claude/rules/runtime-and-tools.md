@@ -22,12 +22,12 @@ Status: **built.** Code: `src/agent_workcell/tools.py`, `tool_server.py`, `runti
 ## Runtime adapters
 
 - The interface stays small: start one run, get a stream of events. Do not add a method for one runtime's feature.
-- Each adapter owns its **hardening profile**: no shell, no file tools, no web access, only our tool server, an empty
-  working folder outside any project, no settings or instruction files picked up from disk, a time cap and a cost cap.
+- Each adapter owns its **hardening profile**: no shell, no file tools, no web access, only our tool server, the person's
+  own working folder outside any project, no settings or instruction files picked up from disk, a time cap and a cost cap.
 - The person's message goes to the runtime on standard input or through an API field. Never as a command-line
   argument.
 - Pass the runtime only the environment variables it needs. Never the database password.
-- Give the runtime its own empty configuration folder inside the run's folder (`CLAUDE_CONFIG_DIR` for Claude Code).
+- Give the runtime its own configuration folder inside the person's folder (`CLAUDE_CONFIG_DIR` for Claude Code).
   The server user's own configuration brings a personal sign-in, account details the model can read, and
   transcripts of every run left on disk.
 - Products run on an API key. The Claude Code sign-in mode is for one person on their own computer: a loopback
@@ -56,6 +56,8 @@ Status: **built.** Code: `src/agent_workcell/tools.py`, `tool_server.py`, `runti
   Excel: inline strings only, never a formula element. CSV: an apostrophe before text that starts like a formula.
 - A file over its caps is not made. Never hand out a file that silently misses rows.
 - A file or a note belongs to the whole principal (`memory.person_key`), not to the user id alone.
+- A conversation belongs to the whole principal too. The server chooses its session id; never take one from the
+  model or the browser, and never send it to the host.
 
 ## Memory and limits
 

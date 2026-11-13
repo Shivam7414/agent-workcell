@@ -39,7 +39,13 @@ what exists. Nothing here is a promise unless its tests are in the repository.
 | Rule | Tests |
 |---|---|
 | Access is enforced by the database | `tests/security/test_attack_suite.py`: hostile queries run as six test people (three roles, a supplier user with no supplier id, and a connection with nobody bound). Each result must equal the result of the same query on a schema that physically holds only that person's rows, built by an independent oracle (`tests/security/oracle.py`). Queries that reach outside the guard views must be refused. |
+| The documents role can add files' versions and passages and nothing more | `tests/security/test_document_processing.py`: it cannot read business data, read passages back, change a document or delete anything; `documents check` finds each of eleven deliberate breaks (extra rights, a missing right, role flags, membership); the answer server will not start when the check fails |
+| An upload is data, never a path or an instruction | `test_document_processing.py`: the stored file's key is made of numbers and the file's hash, whatever its name; a refused upload leaves no file and no version; uploads need the host key. `tests/unit/test_documents_read.py`: hostile text in a file stays plain text; error messages name no path |
+| Document search finds only what the person may read | `tests/security/test_document_search.py`: for every test person, with and without embeddings, every result belongs to a document the oracle says that person may read, is its current version, and is not deleted; hostile search text is only a value; a supplier never finds the internal evaluation of their own supplier, which the admin does find |
+| The document tools reveal only what the person may read | `tests/security/test_document_tools.py`, over real MCP: search returns only documents the oracle says the person may read, while the admin finds others; reading a document the person may not read gives exactly the answer for one that does not exist; hostile text in a passage is escaped and cannot close its `<passage>` block; when the embedding provider fails, search runs on words, still through the guard; every call is in the audit; the `sources` event lists exactly the documents the tools returned, with titles from the database |
+| Passages of a new file follow their document's access | `test_document_processing.py`: after processing, the document's supplier finds the new passage, another supplier does not |
 | Per person and table, exactly the allowed rows | `tests/security/test_parity.py`, including a check that a deliberately widened policy is caught |
+| Documents follow the same guard | The attack suite and the parity test cover `documents`, `document_versions` and `document_chunks`. `tests/security/test_documents.py`: a supplier user never sees the internal evaluation of their own supplier, sees a document of an order only once the order was sent, and cannot find a hidden document's text by searching passages; a buyer never sees admin documents or the documents of another buyer's orders. `test_parity.py`: a document rule that forgets the audience is caught |
 | Fail closed | Nobody bound sees no rows (while the real tables have rows); unknown roles and attributes are refused; unmarked columns stay hidden (`test_identity.py`, `test_doctor.py`) |
 | Identity never comes from the model | The agent role cannot call `bind` or write `sessions`; settings written by the model change nothing; a reused process id gets nobody; a bound connection cannot be bound again (`test_identity.py`) |
 | Read only, one query, caps | `test_limits.py` |
@@ -49,6 +55,7 @@ what exists. Nothing here is a promise unless its tests are in the repository.
 | The runtime has no shell, file or web tools, and no server secrets | `tests/unit/test_runtime_and_prompt.py` checks the options the adapter passes, that the runtime gets only absolute paths, and that the service refuses a data folder inside a code project; `tests/runtime_conformance/` checks the real runtime, by hand |
 | Every answer is bounded and leaves an audit record | `test_answer_server.py`: a run that takes too long is stopped, and its token, connection and folder are released; the audit holds the queries and never the token |
 | Each person is bounded | `test_answer_server.py`: the daily answer limit, the daily cost limit (with the cap reserved for each answer, and unknown costs counted at the cap), and the limit on answers at once; `test_runtime_and_prompt.py`: a limit of zero is refused at start-up |
+| A conversation belongs to one person | `tests/security/test_conversations.py`: the same conversation id from another person, or after a change of role or supplier, is a new session in another folder; the session id comes from the server and never reaches the host; one conversation runs one answer at a time; a malformed conversation id is refused |
 | Memory is never authorization and never trusted | `test_answer_server.py`: a note that claims the admin role is escaped in the next message and changes no rows; one person's notes never reach another; the person can list and delete them. `test_memory.py`: notes belong to the whole principal; a note cannot close its block |
 | The model never retypes data | `test_answer_server.py`: a file holds exactly the person's rows; only its owner can download it; a result over the cap makes no file. `test_files.py`: text that looks like a formula is never a formula, in CSV or Excel; a title cannot name a path |
 | No outbound path for data in the answer | `test_render.py`: hostile text, including the hostile records of the reference ERP, never becomes a tag, an attribute, an image or a link. `test_host_app.py`: the chat page allows no inline script and no outside source, and sets HTML only from the cleaned answer |
@@ -68,6 +75,11 @@ It should not be able to read other rows, write anything or send data out, becau
 reference ERP carries hostile text in its records so that tests can check this.
 
 ## Known limits
+
+- **Kept sessions hold data.** A conversation's transcript keeps the rows and passages earlier answers read, and
+  nothing deletes it. If a row rule changes while the principal stays the same (for example, an order moves to
+  another buyer), the earlier answers in that conversation still hold what the person could read then. A change of
+  role or attributes starts a new folder and history. Protect the data folder like the database.
 
 - The policy is a second copy of the host application's own permission rules. A test must compare, per role, what the
   guard returns with what the application shows. The reference ERP has no application screens, so its parity test
@@ -96,8 +108,8 @@ reference ERP carries hostile text in its records so that tests can check this.
   one person: it starts only on a loopback address and runs one answer at a time. A service for other people must use
   `ANTHROPIC_API_KEY`; without it the server does not start.
 - **One runtime process per answer.** Each answer starts a Claude Code CLI process (Node.js). Many answers at once
-  mean many processes. Answers running at once are limited per person, but not yet across the whole server, so a
-  burst of people can use up the host's CPU and memory. A server-wide limit is planned.
+  mean many processes. Answers running at once are limited per person, not across the whole server, so a burst
+  of people can use up the host's CPU and memory. A server-wide limit is **planned**.
 - **The run's token reaches the runtime process** (in its MCP configuration), though not the model. Anyone who can
   read that process's memory during the run can call the tools as that person until the run ends. The token is
   random, lives only for one answer, and works only against this server.

@@ -51,7 +51,8 @@ def tool_server():
     running.should_exit = True
 
 
-def run(tool_server, tmp_path: Path, message: str) -> tuple[list, Finished]:
+def run(tool_server, tmp_path: Path, message: str, session_id: str | None = None,
+        resume: bool = False) -> tuple[list, Finished]:
     from agent_workcell.runtime.claude import ClaudeRuntime
 
     server, url = tool_server
@@ -59,7 +60,8 @@ def run(tool_server, tmp_path: Path, message: str) -> tuple[list, Finished]:
     workdir.mkdir(exist_ok=True)
     request = RunRequest(run_id=uuid.uuid4().hex, system_prompt="You answer questions. Use only your tools.",
                          message=f"<question>{message}</question>", mcp_url=url, mcp_token=secrets.token_urlsafe(32),
-                         model="claude-opus-5-5", max_turns=6, max_usd=MAX_USD, workdir=workdir)
+                         model="claude-opus-5-5", max_turns=6, max_usd=MAX_USD, workdir=workdir,
+                         session_id=session_id, resume=resume)
 
     async def collect():
         return [event async for event in ClaudeRuntime(account_login=ACCOUNT_LOGIN).run(request)]
@@ -158,3 +160,15 @@ def test_the_runtime_leaves_no_transcript_outside_its_run_folder(tool_server, tm
     after = set(projects.iterdir()) if projects.is_dir() else set()
     assert after == before, f"a transcript was written to the server user's home: {after - before}"
     assert (tmp_path / "run" / ".claude-config").is_dir(), "the CLI's config folder is inside the run's folder"
+
+
+def test_a_resumed_session_sees_the_earlier_question(tool_server, tmp_path):
+    """A conversation continues: the second run resumes the session the first one started, in the same folder."""
+    session = str(uuid.uuid4())
+    word = secrets.choice(["quartz", "harbor", "lantern", "meadow"])
+    _, first = run(tool_server, tmp_path, f"Remember the word {word}. Reply with OK only.", session_id=session)
+    assert first.ok, first.error
+    _, second = run(tool_server, tmp_path, "Which word did I ask you to remember? Reply with the word only.",
+                    session_id=session, resume=True)
+    assert second.ok, second.error
+    assert word in second.answer.lower(), second.answer

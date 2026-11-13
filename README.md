@@ -12,7 +12,7 @@ agent loop on top of a raw model API. It takes an existing agent runtime and bui
 |---|---|
 | Data guard | The database itself decides which rows and columns each person may read. Never the prompt. |
 | Knowledge graph | The business meaning of the data, written once and checked against the real system. |
-| Tools | A small set of tools over MCP: look up knowledge, read data, make files. |
+| Tools | A small set of tools over MCP: look up knowledge, read data, search and read documents, make files. |
 | Identity | Who is asking, taken from the server. The model cannot change it. |
 | Memory | Short notes per person, kept apart from anything trusted. |
 | Audit | Every answer stored with the exact queries behind it. |
@@ -35,7 +35,8 @@ query to run; the project engineers what it works in. For example, "How many inv
 
 What it still relies on, stated plainly:
 
-- **No** chunking, embeddings, vector search or reranking.
+- **No** chunking, embeddings, vector search or reranking for structured data. Documents are free text and do use
+  passages, embeddings and search (see "The same flow for documents").
 - The role's **whole data guide** goes in the system prompt with every question. That works for the 13 tables of the
   reference ERP; a much larger schema would not fit.
 - A **keyword lookup** tool (`knowledge`) matches the words of a question against names, aliases and screen words and
@@ -43,14 +44,32 @@ What it still relies on, stated plainly:
 - **People maintain the knowledge files** (aliases, screen words, rules, calculations), and there is one fixed system
   prompt. The engineering work moves into the knowledge; it does not disappear.
 
-Not proven yet: that the agent explores well when the guide is not enough, and any difference in accuracy, cost or
+Not proven: that the agent explores well when the guide is not enough, and any difference in accuracy, cost or
 maintenance against a retrieval pipeline. No retrieval baseline has been run. Details in
 [docs/architecture.md](docs/architecture.md), "Compared with a retrieval pipeline".
+
+## The same flow for documents
+
+Documents (agreements, policies, certificates, files attached to an order) use the same flow as structured data. No
+second system and no separate access rules are needed:
+
+| Concern | Structured data | Documents |
+|---|---|---|
+| Where it lives | Business tables | Document, version and passage tables in the same database |
+| Who may read it | Guard views from the policy | The same guard views, with row rules on each document's audience, supplier and order |
+| How the agent finds it | `knowledge`, `get_schema`, `run_query` | `search_documents` (words and meaning), `read_document` |
+| Who decides what to look up | The agent | The agent: when to search, what for, and whether to read more |
+| What the person sees as evidence | The queries behind the answer | A sources list built by the server from the database rows |
+
+Retrieval appears only where it fits, as a tool the agent calls, and it runs as the person who asked. For example, a
+supplier who asks about payment terms finds passages from their own agreement only; the database leaves out every
+other supplier's documents and the company's internal evaluations. Details in
+[docs/architecture.md](docs/architecture.md), "Documents".
 
 ## Status
 
 **Early stage, not independently reviewed.** Do not use it with production data. [docs/roadmap.md](docs/roadmap.md)
-lists what exists, what is not proven yet and what is planned.
+lists what exists, what is not proven and what is planned.
 
 What exists:
 
@@ -65,6 +84,10 @@ What exists:
   and an audit record of every answer and query;
 - **files and memory**: CSV and Excel files that the server builds from a query (text never runs as a formula), and
   short notes per person that never change access. The answer is returned as cleaned HTML;
+- **documents** behind the same data guard: documents, versions and passages in the business database, an upload API,
+  a job queue with retries, readers for text, Markdown and CSV, embeddings from OpenAI or OpenRouter, hybrid search
+  by words and meaning through the guard, and two tools with which the agent searches and reads documents and cites
+  them;
 - a **reference chat page** with sign-in for the reference ERP's users, to try the whole flow locally;
 - an **evaluation harness**: 28 benchmark cases with gold SQL run through the guard as the same person, permission
   probes, graders in plain code, and a total cost budget for real runs.
@@ -124,7 +147,7 @@ Before you run it for other people:
   on 127.0.0.1 only, runs one answer at a time, and your account's email address reaches the model.
 - **Each answer starts a process.** The runtime is the Claude Code CLI, a Node.js program, started once per answer.
   Every run sends the system prompt (with the role's data guide) and the tool descriptions again. Answers running at
-  once are limited per person, not yet per server. Plan CPU, memory and API cost for that; see
+  once are limited per person, not per server. Plan CPU, memory and API cost for that; see
   [docs/architecture.md](docs/architecture.md), "One process per answer".
 
 ```bash
@@ -165,7 +188,7 @@ With `ERP_TEST_DATABASE_URL` set, the run includes the guard's attack suite (`te
 
 - [docs/architecture.md](docs/architecture.md): the design and the reasons behind it
 - [docs/security-model.md](docs/security-model.md): what is trusted, what is not, and how access is enforced
-- [docs/roadmap.md](docs/roadmap.md): what exists, what is not proven yet, and what is planned
+- [docs/roadmap.md](docs/roadmap.md): what exists, what is not proven, and what is planned
 - [reference_erp/README.md](reference_erp/README.md): the reference ERP and its deliberate traps
 - [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md)
 

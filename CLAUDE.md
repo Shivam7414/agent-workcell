@@ -9,7 +9,7 @@ Read these before you design anything:
 
 - `docs/architecture.md`: the design and the reasons
 - `docs/security-model.md`: what is trusted and what is not
-- `docs/roadmap.md`: **what exists today**, what is not proven yet and what is planned. Check here before you assume
+- `docs/roadmap.md`: **what exists today**, what is not proven and what is planned. Check here before you assume
   a module exists, and keep it true when you add or finish a part.
 
 ## Hard rules (never break these)
@@ -59,6 +59,8 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"    # Windows: .venv\Sc
 docker compose up -d db               # PostgreSQL on 127.0.0.1:54329, databases erp and erp_test
 docker compose run --rm seed          # load the reference ERP (add --scale 300 for benchmarks, --reset to reload)
 docker compose run --rm guard apply   # install the data guard on the local erp database, then check it
+.venv/bin/python -m agent_workcell.documents apply   # documents role and job table on the local erp database
+.venv/bin/python -m agent_workcell.documents work    # process uploaded files (--once stops when none is due)
 .venv/bin/python -m agent_workcell.guard plan --policy reference_erp/policy.toml   # print the install SQL
 .venv/bin/python bench/guard_latency/run.py --scale 1                         # guard latency benchmark
 .venv/bin/python -m agent_workcell.knowledge check    # knowledge vs the live database (needs WORKCELL_KNOWLEDGE,
@@ -73,12 +75,13 @@ docker compose run --rm guard apply   # install the data guard on the local erp 
 
 | Path | What |
 |---|---|
-| `src/agent_workcell/` | The package: `policy.py`, `guard/`, `knowledge/`, `tools.py`, `tool_server.py`, `runtime/`, `server.py`, `prompt.py`, `audit.py`, `config.py`, `memory.py`, `files.py`, `render.py`, `eval/`. |
+| `src/agent_workcell/` | The package: `policy.py`, `guard/`, `knowledge/`, `tools.py`, `tool_server.py`, `runtime/`, `server.py`, `prompt.py`, `audit.py`, `config.py`, `memory.py`, `files.py`, `render.py`, `documents/`, `eval/`. |
 | `reference_erp/` | Purchase-to-pay schema (`schema.sql`), repeatable made-up data (`seed.py`), access policy (`policy.toml`), knowledge (`knowledge/`), benchmark cases (`eval_cases.toml`) and the reference host application with the chat page (`host_app/`). Not part of the package. |
 | `tests/unit/` | No database, no network |
 | `tests/integration/` | Need PostgreSQL (`-m db`) |
 | `tests/security/` | The guard attack suite and its independent oracle, and the answer server end to end (need PostgreSQL) |
 | `tests/runtime_conformance/` | The Claude adapter against a real model. By hand only; costs money. |
+| `tests/embedding_conformance/` | The embedding providers against their real APIs. By hand only; costs money. |
 | `bench/` | Benchmarks (`guard_latency/`) and recorded results (`results/`) |
 | `docs/` | Design, security model, status and plans |
 | `website/` | The public page: static HTML, CSS and JavaScript, no build. Not part of the package. Rules in `website/README.md`. |

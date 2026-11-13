@@ -3,7 +3,9 @@
 # for them are planned.
 services:
   db:
-    image: postgres:17
+    # PostgreSQL 17 with the pgvector extension, for document search. The trixie variant has the same C library as
+    # postgres:17, so text indexes in an existing data volume stay valid.
+    image: pgvector/pgvector:pg17-trixie
     environment:
       POSTGRES_USER: erp_owner
       POSTGRES_PASSWORD: ${ERP_OWNER_PASSWORD:-erp_owner_dev}

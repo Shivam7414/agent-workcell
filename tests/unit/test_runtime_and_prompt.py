@@ -62,7 +62,8 @@ def test_the_claude_adapter_gives_the_model_only_the_project_tools(tmp_path):
     assert options.tools == []
     assert options.allowed_tools == ["mcp__workcell__knowledge", "mcp__workcell__get_schema",
                                      "mcp__workcell__run_query", "mcp__workcell__create_file",
-                                     "mcp__workcell__remember"]
+                                     "mcp__workcell__remember", "mcp__workcell__search_documents",
+                                     "mcp__workcell__read_document"]
     for name in ("Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch", "Agent", "Skill"):
         assert name in options.disallowed_tools
     assert set(BUILT_IN_TOOLS) <= set(options.disallowed_tools)
@@ -141,8 +142,8 @@ def test_the_account_login_mode_is_off_unless_asked_for():
 
 def test_the_system_prompt_goes_in_a_file_and_the_message_never_on_a_command_line(tmp_path):
     options = build_options(request(tmp_path), inherited_env={})
-    assert options.system_prompt == {"type": "file", "path": str(tmp_path / "system_prompt.md")}
-    assert (tmp_path / "system_prompt.md").read_text(encoding="utf-8") == "SYSTEM"
+    assert options.system_prompt == {"type": "file", "path": str(tmp_path / "system_prompt-r1.md")}
+    assert (tmp_path / "system_prompt-r1.md").read_text(encoding="utf-8") == "SYSTEM"
     assert "<question>" not in str(options.extra_args)
 
 
@@ -152,7 +153,7 @@ def test_a_relative_work_folder_still_gives_the_runtime_absolute_paths(tmp_path,
     Path("runs", "r1").mkdir(parents=True)
     options = build_options(request(Path("runs", "r1")), inherited_env={})
     folder = tmp_path / "runs" / "r1"
-    assert Path(options.cwd) == folder and Path(options.system_prompt["path"]) == folder / "system_prompt.md"
+    assert Path(options.cwd) == folder and Path(options.system_prompt["path"]) == folder / "system_prompt-r1.md"
     assert Path(options.env["CLAUDE_CONFIG_DIR"]) == folder / ".claude-config"
     assert all(Path(path).is_absolute() for path in (options.cwd, options.system_prompt["path"]))
 
@@ -268,3 +269,24 @@ def test_the_audit_keeps_each_answer_with_its_tool_calls(tmp_path):
     calls = audit.tool_calls("run-1")
     assert calls[0]["sql_text"] == "SELECT 1" and calls[0]["rows"] == 1 and calls[0]["truncated"] == 0
     audit.close()
+
+
+def test_the_first_answer_starts_the_servers_session_and_later_answers_resume_it(tmp_path):
+    from dataclasses import replace
+
+    session = "6f1c0c2e-6f43-4d1e-9a51-0d3b5c9e2a10"
+    first = build_options(replace(request(tmp_path), session_id=session), inherited_env={})
+    later = build_options(replace(request(tmp_path), session_id=session, resume=True), inherited_env={})
+    plain = build_options(request(tmp_path), inherited_env={})
+    assert (first.session_id, first.resume) == (session, None)
+    assert (later.resume, later.session_id) == (session, None)
+    assert (plain.session_id, plain.resume, plain.continue_conversation) == (None, None, False)
+
+
+def test_two_runs_in_one_persons_folder_get_their_own_prompt_files(tmp_path):
+    from dataclasses import replace
+
+    one = build_options(replace(request(tmp_path), run_id="a", system_prompt="ONE"), inherited_env={})
+    two = build_options(replace(request(tmp_path), run_id="b", system_prompt="TWO"), inherited_env={})
+    assert Path(one.system_prompt["path"]).read_text(encoding="utf-8") == "ONE"
+    assert Path(two.system_prompt["path"]).read_text(encoding="utf-8") == "TWO"

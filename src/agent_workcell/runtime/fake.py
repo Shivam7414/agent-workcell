@@ -42,8 +42,10 @@ class FakeRuntime:
         self.script = script
         self.echo = echo  # when True, each tool result is also said, so it ends up in the answer
         self.results: list[str] = []  # the text of every tool result, for tests to inspect
+        self.requests: list[RunRequest] = []  # every run request, for tests to inspect (session, folder)
 
     async def run(self, request: RunRequest) -> AsyncIterator[Event]:
+        self.requests.append(request)
         steps = self.script(request) if callable(self.script) else self.script
         answer: list[str] = []
         http = create_mcp_http_client(headers={"Authorization": f"Bearer {request.mcp_token}"})

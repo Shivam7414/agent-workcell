@@ -139,7 +139,9 @@ def test_no_tool_takes_a_user_role_or_tenant_argument(server):
     listed = anyio.run(server.service.tool_server.mcp.list_tools)
     arguments = {tool.name: set(tool.input_schema["properties"]) for tool in listed}
     assert arguments == {"knowledge": {"question"}, "get_schema": {"tables"}, "run_query": {"sql"},
-                         "create_file": {"sql", "format", "title"}, "remember": {"note"}}
+                         "create_file": {"sql", "format", "title"}, "remember": {"note"},
+                         "search_documents": {"query", "limit"},
+                         "read_document": {"doc_number", "version", "first_passage", "count"}}
 
 
 def test_a_tool_call_without_a_valid_token_is_refused(server):
@@ -184,7 +186,8 @@ def test_an_answer_that_runs_too_long_is_stopped_and_everything_is_released(serv
     assert finished["ok"] is False and "longer than 1 seconds" in finished["error"]
     assert server.service.tool_server.open_runs() == 0
     assert sessions(guard_db) == before, "the guarded connection was closed and unbound"
-    assert not any((server.settings.data_dir / "runs").iterdir()), "the run's working folder was removed"
+    assert not (server.settings.data_dir / "runs").exists(), "no folder is made per run"
+    assert not server.service.busy_conversations and not server.service.running, "every reservation was released"
 
 
 # The host API

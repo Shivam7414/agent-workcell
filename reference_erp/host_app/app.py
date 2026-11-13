@@ -37,6 +37,8 @@ from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Re
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from agent_workcell.conversations import valid_conversation_id
+
 STATIC = Path(__file__).parent / "static"
 COOKIE = "workcell_session"
 SESSION_SECONDS = 8 * 3600
@@ -311,8 +313,15 @@ def create_host_app(settings: HostSettings) -> Starlette:
         if not question or len(question) > MAX_QUESTION_CHARS:
             return secure(JSONResponse({"error": f"Ask with 1 to {MAX_QUESTION_CHARS} characters."},
                                        status_code=400))
-        # Only the question is taken from the browser. The principal comes from the signed session.
+        # Only the question and the conversation's name are taken from the browser. The principal comes from the
+        # signed session, and the answer server keys every conversation by that principal, so a browser cannot name
+        # its way into another person's conversation.
         payload = {"principal": principal_of(session), "question": question}
+        conversation_id = body.get("conversation_id")
+        if conversation_id is not None:
+            if not valid_conversation_id(conversation_id):
+                return secure(JSONResponse({"error": "The conversation id is not valid."}, status_code=400))
+            payload["conversation_id"] = conversation_id
         client = httpx2.AsyncClient(timeout=httpx2.Timeout(10, read=None))
         try:
             upstream = await client.send(client.build_request(

@@ -9,6 +9,9 @@ const askForm = document.getElementById("ask");
 const questionBox = document.getElementById("question");
 const sendButton = document.getElementById("send");
 const notesList = document.getElementById("notes");
+// One conversation per page: follow-up questions continue it, and reloading the page starts a new one. The answer
+// server keys it by the signed-in person, so this id names a conversation but grants nothing.
+const conversationId = crypto.randomUUID();
 const SVG = "http://www.w3.org/2000/svg";
 
 // What each role may see. This only describes the access; the database enforces it.
@@ -37,7 +40,32 @@ const STEP_WORDS = {
   run_query: "Ran a query",
   create_file: "Built a file",
   remember: "Saved a note",
+  search_documents: "Searched documents",
+  read_document: "Read a document",
 };
+
+// The sources event comes from the answer server, built from the database rows the document tools returned. Every
+// value is shown with textContent: titles and sections are text from documents.
+function sourcesList(data) {
+  const details = element("details", "sources");
+  const cited = data.documents.filter((document) => document.cited).length;
+  details.open = cited > 0;
+  details.append(element("summary", "", `Sources: ${data.documents.length} documents read, ${cited} cited`));
+  const list = element("ul");
+  for (const document of data.documents) {
+    const item = element("li", document.cited ? "cited" : "");
+    item.append(element("strong", "", `${document.doc_number} ${document.title}`));
+    const places = document.passages.map((passage) => [
+      passage.page !== null ? `page ${passage.page}` : null,
+      passage.section ? `"${passage.section}"` : null,
+      `passage ${passage.passage}`,
+    ].filter(Boolean).join(", "));
+    item.append(element("span", "", ` (version ${document.version_no}): ${places.join("; ")}`));
+    list.append(item);
+  }
+  details.append(list);
+  return details;
+}
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -135,8 +163,9 @@ async function ask(question) {
   scrollDown();
 
   const queries = [];
+  let sources = null;
   const started = performance.now();
-  const response = await postJson("/api/ask", { question });
+  const response = await postJson("/api/ask", { question, conversation_id: conversationId });
   if (!response.ok) {
     if (response.status === 401) window.location.assign("/login");
     dots.remove();
@@ -156,6 +185,8 @@ async function ask(question) {
     } else if (event.type === "note") {
       steps.append(element("li", "note", "Saved a note: " + data.text));
       loadNotes();
+    } else if (event.type === "sources") {
+      sources = sourcesList(data);
     } else if (event.type === "finished") {
       dots.remove();
       if (data.ok) {
@@ -167,6 +198,7 @@ async function ask(question) {
         draft.textContent = data.error || "The answer could not be completed. Try again.";
         reply.classList.add("failed");
       }
+      if (sources) reply.append(sources);
       if (queries.length) {
         const details = element("details", "queries");
         details.append(element("summary", "", `Queries behind this answer (${queries.length})`));

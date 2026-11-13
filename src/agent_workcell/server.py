@@ -1,10 +1,15 @@
 """The answer server.
 
-    POST /v1/answers          the host application asks a question for one authenticated person; the answer streams
-                              back as server-sent events
+    POST /v1/answers          the host application asks a question for one authenticated person, optionally in a
+                              conversation (conversation_id), which continues that person's session; the answer streams
+                              back as server-sent events: text, tool_call, tool_result, file, note, sources and,
+                              last, finished
     POST /v1/files/{file_id}  a file that an answer built, for the person who owns it
     POST /v1/memory           the person's saved notes
     POST /v1/memory/clear     delete the person's saved notes
+    POST /v1/documents/{document_id}/versions
+                              a new file for a document: the request body is the file. Only when
+                              WORKCELL_DOCUMENTS_DATABASE_URL is set
     GET  /health              liveness
     /mcp                      the tool server, used by the agent runtime on this machine
 
@@ -21,15 +26,17 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import datetime as dt
+import hashlib
 import json
+import os
 import secrets
-import shutil
 import sys
 import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import aclosing, asynccontextmanager
 from dataclasses import dataclass, field
+from urllib.parse import unquote
 
 import anyio
 import psycopg
@@ -41,6 +48,17 @@ from starlette.routing import Mount, Route
 from agent_workcell import prompt, render
 from agent_workcell.audit import AnswerRecord, AuditLog
 from agent_workcell.config import ConfigError, Settings, check_claude_access, load_settings
+from agent_workcell.conversations import Conversations, valid_conversation_id
+from agent_workcell.documents.embed import Embedder, EmbeddingConfigError, embedder_from_env
+from agent_workcell.documents.read import media_type_for
+from agent_workcell.documents.store import (
+    DEFAULT_DOCUMENT_NAMES,
+    DocumentNames,
+    UnknownDocument,
+    Upload,
+    check_role,
+    register,
+)
 from agent_workcell.files import FileStore
 from agent_workcell.guard import GuardedConnection, GuardError, Limits, Principal
 from agent_workcell.guard.doctor import check, errors
@@ -50,9 +68,10 @@ from agent_workcell.memory import Memory, person_key
 from agent_workcell.policy import Policy, load_policy
 from agent_workcell.runtime import Event, Finished, RunRequest, Runtime
 from agent_workcell.tool_server import ToolServer
-from agent_workcell.tools import RoleKnowledge, RunContext, load_role_knowledge
+from agent_workcell.tools import RoleKnowledge, RunContext, load_role_knowledge, sources_event
 
 MAX_QUESTION_CHARS = 4_000
+MAX_FILE_NAME_CHARS = 255
 
 
 @dataclass
@@ -67,9 +86,13 @@ class AnswerService:
     memory: Memory
     files: FileStore
     names: Names = DEFAULT_NAMES
+    document_names: DocumentNames = DEFAULT_DOCUMENT_NAMES
+    embedder: Embedder | None = None  # search by meaning in documents; None searches by words only
+    conversations: Conversations | None = None  # which session continues which conversation; None: no history
     running: dict[str, int] = field(default_factory=dict)  # answers running now, per person
+    busy_conversations: set[tuple[str, str]] = field(default_factory=set)  # (person, conversation) running now
 
-    def limit_refusal(self, principal: Principal) -> str | None:
+    def limit_refusal(self, principal: Principal, conversation_id: str | None = None) -> str | None:
         """Why this person may not start an answer now, or None. The cost check reserves the full per-answer cap for
         each running answer and for the new one, so the daily cost limit holds even if they all reach the cap."""
         settings, person = self.settings, str(principal.user_id)
@@ -79,6 +102,9 @@ class AnswerService:
             return "The server is in the local sign-in mode and runs one answer at a time. Try again shortly."
         if running >= settings.concurrent_answers:
             return "Another answer for you is still running. Wait for it to finish."
+        if conversation_id and (person_key(principal), conversation_id) in self.busy_conversations:
+            # One answer at a time per conversation: two runs must never write the same session.
+            return "An answer in this conversation is still running. Wait for it to finish."
         count, cost = self.audit.usage_since(person, _day_start(), unknown_cost=settings.answer_max_usd)
         if count + running >= settings.daily_answers:
             return "You have reached the daily limit of answers. It resets at midnight UTC."
@@ -86,17 +112,22 @@ class AnswerService:
             return "You have reached the daily cost limit. It resets at midnight UTC."
         return None
 
-    async def answer(self, principal: Principal, question: str, name: str | None = None) -> AsyncIterator[Event]:
-        """Stream the events of one answer. The last event is always Finished."""
+    async def answer(self, principal: Principal, question: str, name: str | None = None,
+                     conversation_id: str | None = None) -> AsyncIterator[Event]:
+        """Stream the events of one answer. The last event is always Finished. With a conversation id, the answer
+        continues that conversation's session, so the model sees the earlier questions and answers."""
         # The check and the reservation run with no await between them, so two requests cannot both pass.
-        refusal = self.limit_refusal(principal)
+        refusal = self.limit_refusal(principal, conversation_id)
         if refusal:
             yield Finished(ok=False, error=refusal)
             return
         person = str(principal.user_id)
         self.running[person] = self.running.get(person, 0) + 1
+        busy = (person_key(principal), conversation_id) if conversation_id else None
+        if busy:
+            self.busy_conversations.add(busy)
         queue: asyncio.Queue[Event | None] = asyncio.Queue()
-        producer = asyncio.create_task(self._produce(principal, question, name, queue))
+        producer = asyncio.create_task(self._produce(principal, question, name, conversation_id, queue))
         try:
             while (event := await queue.get()) is not None:
                 yield event
@@ -108,8 +139,10 @@ class AnswerService:
             self.running[person] -= 1
             if not self.running[person]:
                 del self.running[person]
+            if busy:
+                self.busy_conversations.discard(busy)
 
-    async def _produce(self, principal: Principal, question: str, name: str | None,
+    async def _produce(self, principal: Principal, question: str, name: str | None, conversation_id: str | None,
                        queue: asyncio.Queue[Event | None]) -> None:
         settings = self.settings
         knowledge = self.roles[principal.role]
@@ -119,10 +152,16 @@ class AnswerService:
             run_id=run_id, started_at=_now(), role=principal.role, user_id=str(principal.user_id),
             question=question, runtime=self.runtime.name, runtime_version=self.runtime.version,
             model=settings.model, prompt_hash=prompt.prompt_hash(system_prompt))
-        workdir = settings.data_dir / "runs" / run_id
-        workdir.mkdir(parents=True)
+        # The person's own folder, kept between answers: the runtime keeps the person's sessions there.
+        workdir = person_folder(settings.data_dir, principal)
+        workdir.mkdir(parents=True, exist_ok=True)
+        session_id, resume = str(uuid.uuid4()), False
+        if conversation_id and self.conversations is not None:
+            session_id, resume = await anyio.to_thread.run_sync(
+                lambda: self.conversations.session(principal, conversation_id))
+        reached_runtime = False
         started = time.monotonic()
-        connection = token = None
+        connection = token = ctx = None
         finished: Finished | None = None
         loop = asyncio.get_running_loop()
 
@@ -140,17 +179,18 @@ class AnswerService:
 
             file_limits = Limits(settings.query_timeout_ms, settings.file_max_rows, settings.file_max_chars)
             ctx = RunContext(run_id, principal, connection, knowledge, self.graph, record, memory=self.memory,
-                             files=self.files, file_limits=file_limits, emit=emit)
+                             files=self.files, file_limits=file_limits, emit=emit, embedder=self.embedder)
             token = self.tool_server.open_run(ctx)
             notes = [note.text for note in await anyio.to_thread.run_sync(lambda: self.memory.notes(principal))]
             request = RunRequest(
                 run_id=run_id, system_prompt=system_prompt,
                 message=prompt.user_message(question, settings.today_or_now(), name, notes),
                 mcp_url=settings.mcp_url, mcp_token=token, model=settings.model, max_turns=settings.max_turns,
-                max_usd=settings.answer_max_usd, workdir=workdir)
+                max_usd=settings.answer_max_usd, workdir=workdir, session_id=session_id, resume=resume)
             try:
                 async with asyncio.timeout(settings.answer_timeout_s), aclosing(self.runtime.run(request)) as events:
                     async for event in events:
+                        reached_runtime = True
                         if isinstance(event, Finished):
                             finished = event
                             break
@@ -167,7 +207,9 @@ class AnswerService:
                 self.tool_server.close_run(token)
             if connection is not None:
                 await anyio.to_thread.run_sync(connection.close)
-            shutil.rmtree(workdir, ignore_errors=True)
+            if reached_runtime and conversation_id and self.conversations is not None:
+                # The session exists now, so the next answer in this conversation resumes it.
+                await anyio.to_thread.run_sync(lambda: self.conversations.mark_started(principal, conversation_id))
             finished = finished or Finished(ok=False, error="The answer was stopped.")
             finished = dataclasses.replace(finished, answer_html=render.answer_html(finished.answer))
             record.finished_at, record.duration_ms = _now(), int((time.monotonic() - started) * 1000)
@@ -176,8 +218,18 @@ class AnswerService:
             record.input_tokens, record.output_tokens = finished.input_tokens, finished.output_tokens
             record.cost_usd, record.turns = finished.cost_usd, finished.turns
             await anyio.to_thread.run_sync(lambda: self.audit.write(record))
+            # Sources come from the rows the document tools returned, never from the model's text.
+            sources = sources_event(ctx.sources, finished.answer) if ctx is not None else None
+            if sources is not None:
+                queue.put_nowait(sources)
             queue.put_nowait(finished)
             queue.put_nowait(None)
+
+
+def person_folder(data_dir, principal: Principal):
+    """The person's folder under the data folder, named by a hash of the whole principal: a change of role or
+    attributes gives a new folder, with no earlier sessions."""
+    return data_dir / "people" / hashlib.sha256(person_key(principal).encode()).hexdigest()[:32]
 
 
 def _now() -> str:
@@ -190,7 +242,9 @@ def _day_start() -> str:
     return today.isoformat(timespec="milliseconds")
 
 
-def build_service(settings: Settings, runtime: Runtime, names: Names = DEFAULT_NAMES) -> AnswerService:
+def build_service(settings: Settings, runtime: Runtime, names: Names = DEFAULT_NAMES,
+                  document_names: DocumentNames = DEFAULT_DOCUMENT_NAMES, embedder: Embedder | None = None,
+                  ) -> AnswerService:
     """Load everything and check the guard. Refuses to build a service on a guard that does not check out."""
     policy = load_policy(settings.policy)
     graph = load_graph(settings.knowledge)
@@ -200,12 +254,20 @@ def build_service(settings: Settings, runtime: Runtime, names: Names = DEFAULT_N
     if problems:
         raise ConfigError("The guard check failed. The service will not start:\n- "
                           + "\n- ".join(problem.message for problem in problems))
-    audit = AuditLog(settings.data_dir / "audit.sqlite3")
+    if settings.documents_url:
+        with psycopg.connect(settings.documents_url, autocommit=True) as conn:
+            role_problems = check_role(conn, policy.schema, document_names)
+        if role_problems:
+            raise ConfigError("The documents role check failed. The service will not start:\n- "
+                              + "\n- ".join(role_problems))
+    audit =AuditLog(settings.data_dir / "audit.sqlite3")
     tool_server = ToolServer(f"http://{settings.host}:{settings.port}")
     memory = Memory(settings.data_dir / "memory.sqlite3")
     files = FileStore(settings.data_dir / "files", settings.file_keep_hours)
     files.remove_expired()
-    return AnswerService(settings, policy, graph, roles, runtime, audit, tool_server, memory, files, names)
+    conversations = Conversations(settings.data_dir / "conversations.sqlite3")
+    return AnswerService(settings, policy, graph, roles, runtime, audit, tool_server, memory, files, names,
+                         document_names, embedder, conversations)
 
 
 class BadRequest(ValueError):
@@ -257,12 +319,17 @@ def create_app(service: AnswerService) -> Starlette:
         if not question or len(question) > MAX_QUESTION_CHARS:
             return JSONResponse({"error": f"the question must have 1 to {MAX_QUESTION_CHARS} characters"},
                                 status_code=400)
-        refusal = service.limit_refusal(principal)
+        conversation_id = body.get("conversation_id")
+        if conversation_id is not None and not valid_conversation_id(conversation_id):
+            return JSONResponse({"error": "conversation_id must be 1 to 64 letters, digits, '-' or '_'"},
+                                status_code=400)
+        refusal = service.limit_refusal(principal, conversation_id)
         if refusal:
             return JSONResponse({"error": refusal}, status_code=429)
 
         async def stream():
-            async with aclosing(service.answer(principal, question, str(name) if name else None)) as events:
+            async with aclosing(service.answer(principal, question, str(name) if name else None,
+                                               conversation_id)) as events:
                 async for event in events:
                     payload = json.dumps(dataclasses.asdict(event), ensure_ascii=False, default=str)
                     yield f"event: {event.type}\ndata: {payload}\n\n"
@@ -293,6 +360,59 @@ def create_app(service: AnswerService) -> Starlette:
             return JSONResponse({"deleted": service.memory.clear(principal)})
         return JSONResponse({"notes": [dataclasses.asdict(note) for note in service.memory.notes(principal)]})
 
+    async def document_version(request: Request):
+        """The host application decides who may upload and which document the file belongs to. The file is untrusted:
+        its name is only stored, never used as a path, and its content is read later by the worker as data."""
+        if not authorized(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        settings = service.settings
+        file_name = unquote(request.headers.get("x-file-name", "")).strip()
+        if not 0 < len(file_name) <= MAX_FILE_NAME_CHARS or any(ord(ch) < 32 or ord(ch) == 127 for ch in file_name):
+            return JSONResponse({"error": f"send the file's name in X-File-Name, 1 to {MAX_FILE_NAME_CHARS} "
+                                          "characters, URL-encoded"}, status_code=400)
+        uploaded_by = request.headers.get("x-uploaded-by", "")
+        if not uploaded_by.isascii() or not uploaded_by.isdigit() or len(uploaded_by) > 18:
+            return JSONResponse({"error": "send the uploading person's user id in X-Uploaded-By"}, status_code=400)
+        media_type = media_type_for(file_name)
+        if media_type is None:
+            return JSONResponse({"error": "this type of file is not supported; send .txt, .md or .csv"},
+                                status_code=415)
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > settings.document_max_bytes:
+            return JSONResponse({"error": "the file is too large"}, status_code=413)
+
+        storage_root = settings.data_dir / "documents"
+        incoming = storage_root / "incoming"
+        incoming.mkdir(parents=True, exist_ok=True)
+        received = incoming / uuid.uuid4().hex
+        digest, size = hashlib.sha256(), 0
+        try:
+            async with await anyio.open_file(received, "wb") as out:
+                async for part in request.stream():
+                    size += len(part)
+                    if size > settings.document_max_bytes:
+                        return JSONResponse({"error": "the file is too large"}, status_code=413)
+                    digest.update(part)
+                    await out.write(part)
+            if not size:
+                return JSONResponse({"error": "the file is empty"}, status_code=400)
+            upload = Upload(request.path_params["document_id"], file_name, media_type, size, digest.hexdigest(),
+                            int(uploaded_by))
+
+            def store() -> tuple[int, int]:
+                with psycopg.connect(settings.documents_url, autocommit=True) as conn:
+                    return register(conn, service.policy.schema, storage_root, upload, received,
+                                    service.document_names)
+
+            try:
+                version_id, version_no = await anyio.to_thread.run_sync(store)
+            except UnknownDocument:
+                return JSONResponse({"error": "no such document"}, status_code=404)
+            return JSONResponse({"version_id": version_id, "version_no": version_no, "status": "pending"},
+                                status_code=202)
+        finally:
+            received.unlink(missing_ok=True)  # moved into place on success; removed on every other way out
+
     async def health(request: Request):
         return JSONResponse({"status": "ok"})
 
@@ -301,12 +421,14 @@ def create_app(service: AnswerService) -> Starlette:
         async with mcp_app.router.lifespan_context(mcp_app):
             yield
 
-    return Starlette(routes=[Route("/v1/answers", answers, methods=["POST"]),
-                             Route("/v1/files/{file_id}", file, methods=["POST"]),
-                             Route("/v1/memory", memory, methods=["POST"]),
-                             Route("/v1/memory/clear", memory, methods=["POST"]),
-                             Route("/health", health),
-                             Mount("/", app=mcp_app)], lifespan=lifespan)
+    routes = [Route("/v1/answers", answers, methods=["POST"]),
+              Route("/v1/files/{file_id}", file, methods=["POST"]),
+              Route("/v1/memory", memory, methods=["POST"]),
+              Route("/v1/memory/clear", memory, methods=["POST"]),
+              Route("/health", health)]
+    if service.settings.documents_url:
+        routes.append(Route("/v1/documents/{document_id:int}/versions", document_version, methods=["POST"]))
+    return Starlette(routes=[*routes, Mount("/", app=mcp_app)], lifespan=lifespan)
 
 
 def main() -> int:
@@ -327,7 +449,12 @@ def main() -> int:
                   "trial by one person. One answer runs at a time. The account's email reaches the model and "
                   "transcripts stay in ~/.claude. A service for other people must use ANTHROPIC_API_KEY.",
                   file=sys.stderr)
-        service = build_service(settings, ClaudeRuntime(account_login=settings.claude_account_login))
+        try:
+            embedder = embedder_from_env(os.environ)
+        except EmbeddingConfigError as error:
+            raise ConfigError(str(error)) from None
+        service = build_service(settings, ClaudeRuntime(account_login=settings.claude_account_login),
+                                embedder=embedder)
     except (ConfigError, OSError, psycopg.Error) as error:
         print(error, file=sys.stderr)
         return 2

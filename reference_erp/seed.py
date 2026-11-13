@@ -24,6 +24,8 @@ from decimal import ROUND_HALF_UP, Decimal
 from itertools import accumulate
 from pathlib import Path
 
+from agent_workcell.documents.embed import FAKE_MODEL, embedding_input, fake_vector, vector_text
+
 ANCHOR_DATE = dt.date(2026, 6, 30)
 DEMO_PASSWORD = "workcell-demo"
 ORDERS_PER_SCALE = 3000
@@ -57,7 +59,15 @@ COLUMNS = {
     "payments": ("id", "payment_number", "supplier_id", "method", "status", "payment_date", "amount", "created_at"),
     "payment_allocations": ("id", "payment_id", "supplier_invoice_id", "amount"),
     "audit_log": ("id", "user_id", "action", "entity_type", "entity_id", "detail", "created_at"),
+    "documents": ("id", "doc_number", "title", "kind", "audience", "supplier_id", "purchase_order_id", "created_by",
+                  "created_at", "deleted_at"),
+    "document_versions": ("id", "document_id", "version_no", "file_name", "media_type", "byte_size", "sha256",
+                          "storage_key", "status", "error", "uploaded_by", "created_at"),
+    "document_chunks": ("id", "document_version_id", "chunk_no", "page_number", "section", "content"),
+    "document_chunk_embeddings": ("id", "document_version_id", "chunk_no", "model", "embedding"),
 }
+# Columns the database computes, so the seed never writes them.
+GENERATED_COLUMNS = {"document_chunks": ("search_text",)}
 
 DEPARTMENTS = [("OPS", "Operations"), ("MNT", "Maintenance"), ("ENG", "Engineering"), ("FAC", "Facilities"),
                ("ITS", "IT Services"), ("LAB", "Laboratory"), ("SAF", "Safety"), ("ADM", "Administration")]
@@ -120,6 +130,18 @@ REJECTION_REASONS = ["Price does not match the order.", "Quantity is more than w
 
 EXTRA_CHARGES = ["Freight charge", "On-site service call", "Expedite fee", "Tooling setup"]
 
+# Documents. An order whose id leaves this remainder gets a document. Chosen by id, not by the random generator, so
+# that adding documents did not change any order, receipt, invoice or payment.
+DOCUMENT_ORDER_EVERY = 60
+DOCUMENT_ORDER_REMAINDER = 11
+MEDIA_TYPES = {
+    "pdf": "application/pdf",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+READ_ERRORS = ["The file could not be read: it is protected by a password.",
+               "The file could not be read: it is not a valid file of its type."]
+
 
 def money(value: Decimal) -> Decimal:
     return value.quantize(CENT, rounding=ROUND_HALF_UP)
@@ -146,6 +168,8 @@ class _Generator:
         self.invoice_counts: dict[int, int] = defaultdict(int)
         self.admins: list[int] = []
         self.buyers: list[int] = []
+        self.supplier_names: dict[int, str] = {}
+        self.document_orders: list[tuple] = []  # purchase order rows that get a document
 
     def id(self, table: str) -> int:
         self.next_id[table] += 1
@@ -194,6 +218,7 @@ class _Generator:
                 self.at(created), deleted,
             ))
             self.supplier_terms[supplier_id] = terms
+            self.supplier_names[supplier_id] = name
 
         # A few suppliers get most of the orders, like in real life.
         self.supplier_weights = list(accumulate(1 / (i + 1) ** 0.7 for i in range(len(self.supplier_terms))))
@@ -258,6 +283,8 @@ class _Generator:
             order_date, order_date + dt.timedelta(days=rng.randrange(7, 46)), approved_by, approved_at, notes,
             self.at(order_date), self.at(min(self.anchor, order_date + dt.timedelta(days=2))) if deleted else None,
         ))
+        if po_id % DOCUMENT_ORDER_EVERY == DOCUMENT_ORDER_REMAINDER:
+            self.document_orders.append(batch["purchase_orders"][-1])
         if approved:
             batch["audit_log"].append((self.id("audit_log"), approved_by, "purchase_order.approved", "purchase_order",
                                        po_id, None, approved_at))
@@ -420,6 +447,165 @@ class _Generator:
         for invoice_id, part in parts:
             batch["payment_allocations"].append((self.id("payment_allocations"), payment_id, invoice_id, part))
 
+    # ------------------------------------------------------------------------------------------------------------
+    # Documents: made after every other row, so that they use the random generator last
+
+    def documents(self) -> dict[str, list[tuple]]:
+        rng = self.rng
+        batch: dict[str, list[tuple]] = defaultdict(list)
+
+        def add(title, kind, audience, supplier_id, po_id, created_by, uploaded_by, day, extension, versions) -> None:
+            doc_id = self.id("documents")
+            deleted = self.at(min(self.anchor, day + dt.timedelta(days=rng.randrange(1, 60)))) \
+                if rng.random() < 0.04 else None
+            batch["documents"].append((doc_id, f"D-{doc_id:06d}", title, kind, audience, supplier_id, po_id,
+                                       created_by, self.at(day), deleted))
+            for version_no, sections in enumerate(versions, start=1):
+                self.document_version(batch, doc_id, version_no, version_no == len(versions), title, extension,
+                                      sections, uploaded_by, min(self.anchor, day + dt.timedelta(days=30 * version_no)))
+
+        admin = self.admins[0]
+        policy_day = self.days_ago(rng.randrange(400, 600))
+        add("Purchasing policy", "company_policy", "staff", None, None, admin, admin, policy_day, "pdf",
+            [_purchasing_policy(limit) for limit in (20000, 25000)])
+        add("Supplier payment guideline", "company_policy", "staff", None, None, admin, admin,
+            self.days_ago(rng.randrange(300, 500)), "pdf", [_payment_guideline()])
+        add("Budget plan 2026", "budget_plan", "admins", None, None, admin, admin,
+            self.days_ago(rng.randrange(150, 200)), "xlsx", [_budget_plan(rng)])
+
+        for supplier_id, name in self.supplier_names.items():
+            if supplier_id % 4 == 1:
+                terms = [rng.choice([30, 45, 60]) for _ in range(rng.choices([1, 2, 3], weights=[5, 3, 2])[0] - 1)]
+                terms.append(self.supplier_terms[supplier_id])
+                add(f"Supply agreement with {name}", "supply_agreement", "supplier", supplier_id, None, admin, admin,
+                    self.days_ago(rng.randrange(200, 700)), "pdf",
+                    [_supply_agreement(name, days, rng.randrange(5, 21)) for days in terms])
+            if supplier_id % 5 == 2:
+                add(f"Supplier evaluation: {name}", "supplier_evaluation", "staff", supplier_id, None, admin, admin,
+                    self.days_ago(rng.randrange(20, 300)), "docx", [_supplier_evaluation(name, rng)])
+
+        for order in self.document_orders:
+            po_id, po_number, supplier_id, buyer_id, _, status, order_date, expected_date = order[:8]
+            day = min(self.anchor, order_date + dt.timedelta(days=rng.randrange(0, 5)))
+            if status in ("partially_received", "received", "closed") and rng.random() < 0.5:
+                uploader = rng.choice(self.supplier_users[supplier_id])
+                hostile = " ".join(HOSTILE_NOTES) if po_id % 7 == 0 else None
+                add(f"Quality certificate for order {po_number}", "quality_certificate", "supplier", supplier_id,
+                    po_id, uploader, uploader, day, "pdf", [_quality_certificate(po_number, rng, hostile)])
+            elif rng.random() < 0.5:
+                add(f"Delivery terms for order {po_number}", "order_terms", "supplier", supplier_id, po_id, buyer_id,
+                    buyer_id, day, "docx", [_order_terms(po_number, expected_date)])
+            else:
+                add(f"Quote comparison for order {po_number}", "quote_comparison", "staff", supplier_id, po_id,
+                    buyer_id, buyer_id, day, "xlsx", [_quote_comparison(self.supplier_names[supplier_id], rng)])
+        return batch
+
+    def document_version(self, batch, doc_id, version_no, last, title, extension, sections, uploaded_by, day) -> None:
+        rng = self.rng
+        status, error = "ready", None
+        if last:
+            status = rng.choices(["ready", "failed", "processing", "pending"], weights=[85, 8, 4, 3])[0]
+            error = rng.choice(READ_ERRORS) if status == "failed" else None
+        text = "\n".join(f"{section}\n{content}" for section, content in sections)
+        sha = hashlib.sha256(f"{doc_id}/{version_no}/{text}".encode()).hexdigest()
+        version_id = self.id("document_versions")
+        file_name = f"{title.lower().replace(' ', '-').replace(':', '')}-v{version_no}.{extension}"
+        batch["document_versions"].append((
+            version_id, doc_id, version_no, file_name, MEDIA_TYPES[extension], rng.randrange(20_000, 3_000_000), sha,
+            f"documents/{doc_id}/{version_no}/{sha[:16]}", status, error, uploaded_by, self.at(day),
+        ))
+        if status != "ready":
+            return
+        for chunk_no, (section, content) in enumerate(sections, start=1):
+            # Two sections to a page in a PDF. Word and Excel files have no fixed pages.
+            page = (chunk_no + 1) // 2 if extension == "pdf" else None
+            batch["document_chunks"].append((self.id("document_chunks"), version_id, chunk_no, page, section, content))
+            # The free fake embedder, so search by meaning works on the seed with no provider and no cost.
+            batch["document_chunk_embeddings"].append((self.id("document_chunk_embeddings"), version_id, chunk_no,
+                                                       FAKE_MODEL,
+                                                       vector_text(fake_vector(embedding_input(section, content)))))
+
+
+# The text of the made-up documents. Each function returns the sections of one version: (section title, text).
+
+def _purchasing_policy(limit: int) -> list[tuple[str, str]]:
+    return [
+        ("1. Scope", "This policy applies to every purchase order that Meridian Works sends to a supplier."),
+        ("2. Approval limits", f"An order worth more than {limit:,} US dollars needs the approval of an "
+                               "administrator before it is sent. Smaller orders are approved by the buyer's lead."),
+        ("3. Choosing a supplier", "For an order worth more than 10,000 US dollars, the buyer asks at least three "
+                                   "suppliers for a quote and keeps the comparison with the order."),
+        ("4. Receiving goods", "Goods are received within two working days of delivery. Units that are sent back "
+                               "are recorded as rejected on the goods receipt."),
+    ]
+
+
+def _payment_guideline() -> list[tuple[str, str]]:
+    return [
+        ("1. Matching", "An invoice is paid only when it matches the order and the goods receipt: same items, "
+                        "quantities no higher than the accepted quantity, and the order's prices."),
+        ("2. Due dates", "Invoices are paid by their due date. The due date is the invoice date plus the payment "
+                         "terms agreed with the supplier."),
+        ("3. Rejected invoices", "A rejected invoice is not paid. The supplier is told the reason and may send a "
+                                 "corrected invoice."),
+    ]
+
+
+def _budget_plan(rng: random.Random) -> list[tuple[str, str]]:
+    return [(f"Sheet {code}", f"Department {name}. Planned spending for 2026: "
+                              f"{rng.randrange(20, 400) * 10000:,} US dollars. Reserve for repairs: "
+                              f"{rng.randrange(1, 9) * 5000:,} US dollars.")
+            for code, name in DEPARTMENTS]
+
+
+def _supply_agreement(name: str, terms_days: int, lead_days: int) -> list[tuple[str, str]]:
+    return [
+        ("1. Parties", f"This agreement is between Meridian Works, the buyer, and {name}, the supplier."),
+        ("2. Payment terms", f"Invoices are due {terms_days} days after the invoice date."),
+        ("3. Delivery", f"The supplier delivers within {lead_days} working days of receiving a purchase order."),
+        ("4. Prices", "Prices on a purchase order are fixed once the supplier has accepted the order."),
+        ("5. Ending the agreement", "Either party may end this agreement with 90 days' written notice."),
+    ]
+
+
+def _supplier_evaluation(name: str, rng: random.Random) -> list[tuple[str, str]]:
+    score = rng.randrange(2, 6)
+    return [
+        ("Summary", f"Internal evaluation of {name}. Not to be shared with the supplier. Overall score: {score} of 5."),
+        ("Delivery", f"On-time deliveries in the last twelve months: {rng.randrange(70, 100)} percent."),
+        ("Quality", f"Share of units rejected at receipt: {rng.randrange(0, 60) / 10} percent."),
+        ("Recommendation", "Keep as a preferred supplier." if score >= 4 else "Review before placing new orders."),
+    ]
+
+
+def _order_terms(po_number: str, expected: dt.date) -> list[tuple[str, str]]:
+    return [
+        ("Delivery address", "Meridian Works, receiving dock 3. Deliveries are accepted on working days, 7:00 to "
+                             "15:00."),
+        ("Delivery date", f"The goods for order {po_number} are expected by {expected.isoformat()}."),
+        ("Packing", "Each package shows the order number and the product code on its label."),
+    ]
+
+
+def _quote_comparison(chosen: str, rng: random.Random) -> list[tuple[str, str]]:
+    prices = sorted(rng.randrange(5_000, 80_000) for _ in range(3))
+    return [
+        ("Sheet Quotes", f"Quote A: {prices[0]:,} US dollars. Quote B: {prices[1]:,} US dollars. "
+                         f"Quote C: {prices[2]:,} US dollars."),
+        ("Sheet Decision", f"Chosen supplier: {chosen}, quote A, the lowest price that meets the delivery date."),
+    ]
+
+
+def _quality_certificate(po_number: str, rng: random.Random, hostile: str | None) -> list[tuple[str, str]]:
+    sections = [
+        ("Certificate of conformity", f"The goods delivered for order {po_number} meet the agreed specification."),
+        ("Batch", f"Batch number B-{rng.randrange(10000, 99999)}. Inspected units: {rng.randrange(5, 50)}."),
+    ]
+    if hostile:
+        # Text a supplier wrote into a file. Tests check that it changes nothing.
+        sections.append(("Remarks", hostile))
+    return sections
+
 
 def generate(seed: int = 42, scale: int = 1, anchor: dt.date = ANCHOR_DATE) -> Iterator[dict[str, list[tuple]]]:
     """Batches of {table: rows}. Rows follow COLUMNS, and each batch is safe to load in COLUMNS order."""
@@ -450,6 +636,8 @@ def generate(seed: int = 42, scale: int = 1, anchor: dt.date = ANCHOR_DATE) -> I
         gen.payments(batch, payable)
         yield batch
 
+    yield gen.documents()
+
 
 def load(conn, seed: int = 42, scale: int = 1, anchor: dt.date = ANCHOR_DATE, reset: bool = False) -> dict[str, int]:
     """Write the made-up data. Makes the tables if they are missing. Refuses to add to tables that already have rows."""
@@ -458,7 +646,9 @@ def load(conn, seed: int = 42, scale: int = 1, anchor: dt.date = ANCHOR_DATE, re
         cur.execute("SELECT to_regclass('suppliers') IS NOT NULL")
         if not cur.fetchone()[0]:
             cur.execute(Path(__file__).with_name("schema.sql").read_text(encoding="utf-8"))
-        elif reset:
+        # Safe to run again: it also brings the document tables of an older database up to date.
+        cur.execute(Path(__file__).with_name("documents.sql").read_text(encoding="utf-8"))
+        if reset:
             cur.execute(f"TRUNCATE {', '.join(COLUMNS)} RESTART IDENTITY CASCADE")
         else:
             cur.execute("SELECT EXISTS (SELECT 1 FROM suppliers)")

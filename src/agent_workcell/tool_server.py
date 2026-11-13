@@ -21,7 +21,7 @@ from agent_workcell import tools
 from agent_workcell.tools import RunContext
 
 SERVER_NAME = "workcell"
-TOOL_NAMES = ("knowledge", "get_schema", "run_query", "create_file", "remember")
+TOOL_NAMES = ("knowledge", "get_schema", "run_query", "create_file", "remember", "search_documents", "read_document")
 MAX_SQL_CHARS = 20_000
 MAX_QUESTION_CHARS = 2_000
 MAX_NOTE_INPUT_CHARS = 1_000  # the memory keeps at most memory.MAX_NOTE_CHARS of it
@@ -115,6 +115,31 @@ class ToolServer:
             arguments = {"sql": sql, "format": file_format, "title": name}
             return await anyio.to_thread.run_sync(lambda: tools.record_call(
                 ctx, "create_file", arguments, lambda call: tools.create_file(ctx, sql, file_format, name, call)))
+
+        @self.mcp.tool()
+        async def search_documents(query: str, limit: int = 8) -> str:
+            """Search the text of documents the person may read (agreements, policies, certificates, order files) by
+            words and by meaning. Returns the best passages of each document's current version, each with its
+            citation: document number, title, version, page or section, and passage number. `limit` is 1 to 20."""
+            ctx = self._context()
+            text = query[:MAX_QUESTION_CHARS]
+            count = max(1, min(int(limit), 20))
+            return await anyio.to_thread.run_sync(lambda: tools.record_call(
+                ctx, "search_documents", {"query": text, "limit": count},
+                lambda call: tools.search_documents(ctx, text, count, call)))
+
+        @self.mcp.tool()
+        async def read_document(doc_number: str, version: int | None = None, first_passage: int = 1,
+                                count: int = 5) -> str:
+            """Read passages of one document in order, by its document number (such as D-000012): to see the text
+            around a passage that search found, to read a whole document, or to compare two versions. Without
+            `version`, reads the current version. Also lists the document's versions. `count` is 1 to 10."""
+            ctx = self._context()
+            number = doc_number[:40]
+            arguments = {"doc_number": number, "version": version, "first_passage": first_passage, "count": count}
+            return await anyio.to_thread.run_sync(lambda: tools.record_call(
+                ctx, "read_document", arguments,
+                lambda call: tools.read_document(ctx, number, version, int(first_passage), int(count), call)))
 
         @self.mcp.tool()
         async def remember(note: str) -> str:

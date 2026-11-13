@@ -86,6 +86,7 @@ def test_the_reference_policy_marks_every_column_of_every_table():
     assert set(policy.tables) == set(seed.COLUMNS)
     for name, columns in seed.COLUMNS.items():
         table = policy.tables[name]
+        columns = columns + seed.GENERATED_COLUMNS.get(name, ())
         assert sorted(table.visible + table.hidden) == sorted(columns), name
         assert list(table.visible) == [column for column in columns if column in table.visible], \
             f"{name}: keep visible columns in table order"

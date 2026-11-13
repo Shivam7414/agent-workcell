@@ -111,7 +111,7 @@ def test_the_reference_knowledge_loads_and_covers_every_reference_table():
     assert set(graph.tables) == set(seed.COLUMNS)
     for name, columns in seed.COLUMNS.items():
         table = graph.tables[name]
-        assert set(table.columns) | set(table.ignored) == set(columns), name
+        assert set(table.columns) | set(table.ignored) == set(columns + seed.GENERATED_COLUMNS.get(name, ())), name
 
 
 def test_every_reference_column_that_looks_like_a_link_is_explained():

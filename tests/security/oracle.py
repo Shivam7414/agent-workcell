@@ -16,7 +16,8 @@ from agent_workcell.guard import Principal
 from reference_erp import seed
 
 SENT = {"sent", "partially_received", "received", "closed"}
-HIDDEN_COLUMNS = {"suppliers": {"tax_id", "bank_account"}, "users": {"password_hash"}}
+HIDDEN_COLUMNS = {"suppliers": {"tax_id", "bank_account"}, "users": {"password_hash"},
+                  "document_versions": {"storage_key"}}
 
 
 def generated_tables(seed_value: int = 42) -> dict[str, list[dict]]:
@@ -99,6 +100,8 @@ def _buyer(tables: dict[str, list[dict]], user_id: object) -> dict[str, list[dic
         "payments": [],
         "payment_allocations": [],
         "audit_log": [],
+        **_documents(tables, lambda d: d["audience"] in ("staff", "supplier")
+                     and (d["purchase_order_id"] is None or d["purchase_order_id"] in order_ids)),
     }
 
 
@@ -131,6 +134,24 @@ def _supplier(tables: dict[str, list[dict]], supplier_id: object) -> dict[str, l
         "payments": payments,
         "payment_allocations": [a for a in tables["payment_allocations"] if a["payment_id"] in payment_ids],
         "audit_log": [],
+        # order_ids holds only this supplier's sent orders, so a document of an unsent order stays hidden.
+        **_documents(tables, lambda d: d["audience"] == "supplier" and d["supplier_id"] == supplier_id
+                     and (d["purchase_order_id"] is None or d["purchase_order_id"] in order_ids)),
+    }
+
+
+def _documents(tables: dict[str, list[dict]], readable) -> dict[str, list[dict]]:
+    """The documents a person may read, and the versions and chunks of exactly those documents."""
+    documents = [d for d in tables["documents"] if readable(d)]
+    document_ids = {d["id"] for d in documents}
+    versions = [v for v in tables["document_versions"] if v["document_id"] in document_ids]
+    version_ids = {v["id"] for v in versions}
+    return {
+        "documents": documents,
+        "document_versions": versions,
+        "document_chunks": [c for c in tables["document_chunks"] if c["document_version_id"] in version_ids],
+        "document_chunk_embeddings": [e for e in tables["document_chunk_embeddings"]
+                                      if e["document_version_id"] in version_ids],
     }
 
 
@@ -140,7 +161,9 @@ def build_schema(conn, schema: str, rows: dict[str, list[dict]]) -> None:
         schema=sql.Identifier(schema)))
     for table, columns in seed.COLUMNS.items():
         target = sql.Identifier(schema, table)
-        conn.execute(sql.SQL("CREATE TABLE {} (LIKE {})").format(target, sql.Identifier("public", table)))
+        # INCLUDING GENERATED: a generated column (document_chunks.search_text) is computed as in the real table.
+        conn.execute(sql.SQL("CREATE TABLE {} (LIKE {} INCLUDING GENERATED)").format(
+            target, sql.Identifier("public", table)))
         for column in sorted(HIDDEN_COLUMNS.get(table, ())):
             conn.execute(sql.SQL("ALTER TABLE {} DROP COLUMN {}").format(target, sql.Identifier(column)))
         kept = [column for column in columns if column not in HIDDEN_COLUMNS.get(table, ())]

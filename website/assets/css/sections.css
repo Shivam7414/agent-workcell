@@ -1826,6 +1826,11 @@
   }
 }
 
+/* Open problems: the same grid, with a status tag in place of the icon. */
+.op .tag {
+  justify-self: start;
+}
+
 .limits {
   position: relative;
   display: grid;

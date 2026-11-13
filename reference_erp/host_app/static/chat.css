@@ -251,6 +251,11 @@ a.file:hover { background: color-mix(in srgb, var(--good) 10%, transparent); }
 a.file svg { width: 1.05rem; height: 1.05rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .file-rows { font-weight: 400; color: var(--ink-soft); }
 
+.sources { margin-top: 0.8rem; font-size: 0.85rem; }
+.sources summary { cursor: pointer; color: var(--ink-soft); }
+.sources summary:hover { color: var(--carbon); }
+.sources ul { margin: 0.4rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; color: var(--ink-soft); }
+.sources li.cited { color: var(--ink); }
 .queries { margin-top: 0.8rem; font-size: 0.85rem; }
 .queries summary { cursor: pointer; color: var(--ink-soft); }
 .queries summary:hover { color: var(--carbon); }

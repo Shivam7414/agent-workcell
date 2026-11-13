@@ -6,14 +6,19 @@ only the project's tools over MCP:
 - `tools=[]` removes the built-in tool set, and `disallowed_tools` names each built-in tool again as a second layer;
 - `permission_mode="dontAsk"` denies any call that is not pre-approved, and only the project's MCP tools are;
 - `strict_mcp_config` and `setting_sources=[]`: no MCP servers, settings, CLAUDE.md or skills from disk;
-- the working folder is an empty folder made for the run, outside any project;
+- the working folder is the person's own folder under the data folder, outside any project; it holds nothing but the
+  runtime's configuration and sessions, and a system prompt file that exists only while a run uses it;
 - a turn limit and a cost limit for every run (the server adds a time limit);
 - the environment passed on holds only what the CLI needs: every other inherited variable, including database
   URLs and passwords, is blanked;
-- the CLI's own configuration folder (CLAUDE_CONFIG_DIR) is an empty folder inside the run's folder, deleted with
-  it. Without this the CLI uses the server user's ~/.claude: it signs in with that person's Claude account, tells
-  the model the account's email address, and keeps a transcript of every run, data included, in
-  ~/.claude/projects. Isolated, it needs ANTHROPIC_API_KEY.
+- the CLI's own configuration folder (CLAUDE_CONFIG_DIR) is a folder inside the person's folder. It keeps the
+  person's session transcripts, so a conversation can continue (`resume`), and nothing else: no sign-in, no settings.
+  Without this the CLI uses the server user's ~/.claude: it signs in with that person's Claude account, tells the
+  model the account's email address, and mixes every person's transcripts in ~/.claude/projects. Isolated, it needs
+  ANTHROPIC_API_KEY.
+
+Sessions: the server chooses each conversation's session id. The first answer starts the session with that id
+(`session_id`); every later answer continues it (`resume`), so the model sees the earlier questions and answers.
 
 `account_login=True` turns the isolation off, for trying the server locally with a Claude Code sign-in. Never use it
 on a server: the account's email reaches the model and transcripts stay on disk, and Anthropic does not allow
@@ -61,8 +66,12 @@ def build_options(request: RunRequest, inherited_env: Mapping[str, str] | None =
 
     # Absolute paths: the runtime starts inside the work folder, so a relative path would point below it.
     workdir = request.workdir.resolve()
-    prompt_file = workdir / "system_prompt.md"
+    # One file per run: a person can have two answers running in the same folder.
+    prompt_file = workdir / f"system_prompt-{request.run_id}.md"
     prompt_file.write_text(request.system_prompt, encoding="utf-8")
+    sessions = {}
+    if request.session_id:
+        sessions = {"resume": request.session_id} if request.resume else {"session_id": request.session_id}
     env = runtime_env(os.environ if inherited_env is None else inherited_env)
     if not account_login:
         config_dir = workdir / ".claude-config"
@@ -84,6 +93,7 @@ def build_options(request: RunRequest, inherited_env: Mapping[str, str] | None =
         max_budget_usd=request.max_usd,
         model=request.model,
         env=env,
+        **sessions,
     )
 
 
@@ -139,6 +149,9 @@ class ClaudeRuntime:
         except ClaudeSDKError as error:
             yield Finished(ok=False, answer="", error=f"runtime failed: {type(error).__name__}")
             return
+        finally:
+            # The person's folder is kept for their sessions; the run's prompt file is not.
+            (request.workdir.resolve() / f"system_prompt-{request.run_id}.md").unlink(missing_ok=True)
 
         if result is None:
             yield Finished(ok=False, error="runtime ended without a result")

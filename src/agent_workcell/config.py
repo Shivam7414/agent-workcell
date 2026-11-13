@@ -50,6 +50,9 @@ class Settings:
     file_max_rows: int = 50_000
     file_max_chars: int = 20_000_000
     file_keep_hours: float = 24.0
+    # Documents. Off unless the documents role's URL is set; see agent_workcell/documents.
+    documents_url: str | None = None
+    document_max_bytes: int = 100 * 1024 * 1024
     # Local trials only: let the Claude runtime use this computer's Claude Code sign-in. See runtime/claude.py.
     claude_account_login: bool = False
     today: dt.date | None = None  # fixed "today" for the reference ERP; None means the real date
@@ -91,6 +94,8 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
             concurrent_answers=int(env.get("WORKCELL_CONCURRENT_ANSWERS", "2")),
             file_max_rows=int(env.get("WORKCELL_FILE_MAX_ROWS", "50000")),
             file_keep_hours=float(env.get("WORKCELL_FILE_KEEP_HOURS", "24")),
+            documents_url=env.get("WORKCELL_DOCUMENTS_DATABASE_URL", "").strip() or None,
+            document_max_bytes=int(env.get("WORKCELL_DOCUMENT_MAX_BYTES", str(100 * 1024 * 1024))),
             claude_account_login=env.get("WORKCELL_CLAUDE_ACCOUNT_LOGIN", "") == "1",
             today=today,
         )
@@ -140,7 +145,7 @@ def check_claude_access(settings: Settings, environ: Mapping[str, str] | None = 
 def check_limits(settings: Settings) -> None:
     """A limit of zero would mean "no limit" to some readers and "nothing" to others. Refuse it."""
     positive = ("answer_timeout_s", "answer_max_usd", "max_turns", "daily_answers", "daily_usd", "concurrent_answers",
-                "file_max_rows", "file_max_chars", "file_keep_hours")
+                "file_max_rows", "file_max_chars", "file_keep_hours", "document_max_bytes")
     bad = [name for name in positive if not getattr(settings, name) > 0]
     if bad:
         raise ConfigError("These limits must be greater than zero: " + ", ".join(bad))

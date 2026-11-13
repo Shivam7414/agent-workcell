@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for your interest. The project is at an early stage, so the most valuable contributions right now are a
+Thank you for your interest. The project is at an early stage, so the most valuable contributions are a
 review of the design ([docs/architecture.md](docs/architecture.md), [docs/security-model.md](docs/security-model.md))
 and attempts to bypass the data guard. Its attack suite is in `tests/security/`; a new bypass idea is welcome as a
 test case, even one that already fails.

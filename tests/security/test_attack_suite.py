@@ -76,6 +76,21 @@ COMPARED = [
     "SELECT password_hash FROM users",
     "SELECT tax_id, bank_account FROM suppliers",
     "SELECT * FROM users u WHERE u.password_hash IS NOT NULL",
+    # Documents, their versions and their text
+    "SELECT * FROM documents",
+    "SELECT * FROM document_versions",
+    "SELECT * FROM document_chunks",
+    "SELECT storage_key FROM document_versions",
+    "SELECT id FROM documents WHERE audience = 'admins' OR true",
+    "SELECT d.doc_number, c.page_number, c.content FROM document_chunks c "
+    "JOIN document_versions v ON v.id = c.document_version_id JOIN documents d ON d.id = v.document_id "
+    "WHERE c.content ILIKE '%payment%' OR c.content ILIKE '%evaluation%'",
+    "SELECT d.kind, d.audience, count(c.id) FROM documents d LEFT JOIN document_versions v ON v.document_id = d.id "
+    "LEFT JOIN document_chunks c ON c.document_version_id = v.id GROUP BY d.kind, d.audience",
+    "SELECT row_to_json(v)::text FROM document_versions v",
+    "SELECT count(*) FROM documents WHERE 1 / (CASE WHEN audience = 'admins' THEN 0 ELSE 1 END) = 1",
+    "SELECT count(*) FROM document_chunks WHERE CAST(content AS integer) > 0",
+    "SELECT o.po_number, d.doc_number FROM purchase_orders o RIGHT JOIN documents d ON d.purchase_order_id = o.id",
 ]
 
 REFUSED = [
@@ -84,6 +99,8 @@ REFUSED = [
     ("SELECT * FROM public.users", {"42501"}),
     ("SELECT count(*) FROM public.suppliers WHERE tax_id IS NOT NULL", {"42501"}),
     ('SELECT * FROM "public"."payments"', {"42501"}),
+    ("SELECT content FROM public.document_chunks", {"42501"}),
+    ("SELECT storage_key FROM public.document_versions", {"42501"}),
     ("SELECT * FROM guard_internal.sessions", {"42501"}),
     ("SELECT * FROM guard_internal.principal", {"42501"}),
     ("SELECT guard_internal.bind(pg_backend_pid(), now(), 'admin', 1, NULL)", {"42501"}),

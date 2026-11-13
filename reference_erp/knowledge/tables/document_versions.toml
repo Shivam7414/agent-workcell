@@ -1,0 +1,46 @@
+table = "document_versions"
+record = "One uploaded file of a document. A document gets a new version each time its file is replaced."
+aliases = ["document version", "version", "revision"]
+
+[columns.id]
+description = "Internal number of the version. Its chunks link to it."
+
+[columns.document_id]
+description = "The document this file belongs to."
+link = "documents.id"
+
+[columns.version_no]
+description = "1 for the first file, 2 for the next, and so on. The current version is the highest one whose status is ready."
+aliases = ["version number"]
+
+[columns.file_name]
+description = "The name the file had when it was uploaded."
+
+[columns.media_type]
+description = "The file's type, such as application/pdf."
+aliases = ["file type"]
+
+[columns.byte_size]
+description = "Size of the file in bytes."
+aliases = ["file size"]
+
+[columns.sha256]
+description = "A fingerprint of the file's contents. Two versions with the same value hold the same file."
+
+[columns.storage_key]
+description = "Where the server keeps the file. Never readable by the assistant."
+
+[columns.status]
+description = "Whether the file's text has been read yet. Only a ready version has text in document_chunks."
+values = { pending = "Waiting", processing = "Processing", ready = "Ready", failed = "Failed" }
+
+[columns.error]
+description = "Why reading the file failed, written by the server. Empty unless the status is failed."
+
+[columns.uploaded_by]
+description = "The person who uploaded the file. A user id with no foreign key."
+link = "users.id"
+
+[columns.created_at]
+description = "When the file was uploaded."
+aliases = ["upload date"]

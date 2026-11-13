@@ -109,15 +109,16 @@ class GuardedConnection:
     def backend_start(self) -> dt.datetime:
         return self._backend_start
 
-    def query(self, text: str, limits: Limits | None = None) -> QueryResult:
-        """Run one query. `limits` replaces the connection's limits for this query only (files need larger caps)."""
+    def query(self, text: str, limits: Limits | None = None, params: dict | None = None) -> QueryResult:
+        """Run one query. `limits` replaces the connection's limits for this query only (files need larger caps).
+        `params` are bound values for fixed SQL written by the server, such as a search; the model's SQL has none."""
         limits = limits or self.limits
         if self._conn.closed:
             raise GuardError("The guarded connection is closed. Open a new one; never reconnect this one.")
         try:
             self._conn.execute("SELECT set_config('statement_timeout', %s, true)", [str(limits.timeout_ms)])
             with self._conn.cursor(name="workcell_query") as cursor:
-                cursor.execute(text)  # untrusted SQL, run as the agent role through the guard views
+                cursor.execute(text, params)  # untrusted SQL, run as the agent role through the guard views
                 rows = cursor.fetchmany(limits.max_rows + 1)
                 columns = [column.name for column in cursor.description or []]
         except psycopg.Error as error:

@@ -1,8 +1,8 @@
 # Architecture
 
-This page describes how Agent Workcell works and why. Parts marked **planned** do not exist yet;
+This page describes how Agent Workcell works and why. Parts marked **planned** are not built;
 [roadmap.md](roadmap.md) lists what exists and what is planned. Parts marked **to verify** are design choices that no
-test has proven yet.
+test has proven.
 
 ## The idea
 
@@ -15,7 +15,7 @@ it can touch, and what stops it. Agent Workcell is that surrounding part. The ag
 This also moves where the engineering goes. A retrieval pipeline decides in code what context each kind of question
 gets, and it is tuned as new kinds of questions arrive. Here the agent decides, turn by turn, what to look up and which
 query to run, in an environment built for it. The section "Compared with a retrieval pipeline" sets out the
-difference, the retrieval that remains, and what is not proven yet.
+difference, the retrieval that remains, and what is not proven.
 
 ## Principles
 
@@ -41,7 +41,7 @@ alternative there.
 
 This project splits the work differently. One reused agent runtime reads the whole question, decides what to look up,
 runs a query, reads the result and decides again. The engineering goes into what it works in: a checked description
-of the data, five tools, and a database that decides access.
+of the data, seven tools, and a database that decides access.
 
 | Concern | A typical retrieval pipeline | This project |
 |---|---|---|
@@ -55,7 +55,8 @@ of the data, five tools, and a database that decides access.
 
 ### The retrieval that remains
 
-There is no chunking, no embedding, no vector search and no reranking anywhere in the project. Knowledge and data
+The knowledge graph uses no embedding, no vector search and no reranking. Documents do: they have hybrid search by
+words and meaning, which the agent uses through `search_documents` (see "Documents"). Knowledge and data
 still reach the model in three ways, and each of them is a form of retrieval:
 
 - **The guide in every request.** The role's generated guide is part of the system prompt. Nothing is selected: the
@@ -107,13 +108,14 @@ flowchart TD
 | Policy | One file: for each role, which tables, which rows, which columns | Built |
 | Data guard | Turns the policy into database objects and runs the agent's SQL inside them | Built for PostgreSQL; MariaDB and MySQL **planned** |
 | Knowledge graph | Records, joins, stored values and their screen words, calculations, rules. Checked. | Built |
-| Tool server | `knowledge`, `get_schema`, `run_query`, `create_file`, `remember` over MCP | Built |
+| Tool server | `knowledge`, `get_schema`, `run_query`, `create_file`, `remember`, `search_documents`, `read_document` over MCP | Built |
 | Runtime adapter | Starts one agent run and turns its output into a common stream of events | Built: Claude and a fake runtime for tests |
 | Server | Checks limits, builds the context, streams the answer, cleans the answer HTML, stores the audit record | Built |
 | Memory | Short notes per person, untrusted | Built |
 | Evaluation | Benchmark cases with gold SQL, permission probes, repeat runs | Built |
 | Reference ERP | Purchase-to-pay schema and repeatable made-up data | Built |
 | Reference host application | Sign-in and a chat page for the reference ERP, in front of the answer API | Built |
+| Documents | Documents, their versions, passages and embeddings in the business database behind the guard; upload, a worker, hybrid search and two tools | Built for text, Markdown and CSV files |
 
 ## The data guard
 
@@ -209,14 +211,14 @@ review by whoever owns that database.
 
 Every column of an allowed table must be marked visible or hidden in the policy. A column nobody has marked is hidden,
 and `guard doctor` reports it. A new `salary` column is therefore invisible until someone decides. Column visibility
-is the same for every role that can read the table. Per-role columns are not supported yet.
+is the same for every role that can read the table. Per-role column visibility is **planned**.
 
 ### Speed
 
 `bench/guard_latency/run.py` runs the same queries with and without the guard.
 
 Two recorded runs, both on 2026-11-11, with no model, seed 42, five queries, from an uncommitted working tree
-(there is no commit yet), PostgreSQL 17.11 in Docker on a Windows 11 machine with 12 logical CPUs:
+(no commit recorded), PostgreSQL 17.11 in Docker on a Windows 11 machine with 12 logical CPUs:
 `bench/results/guard-latency-2026-11-11-3000-orders.json` (scale 1, 30 runs per query) and
 `bench/results/guard-latency-2026-11-11-900000-orders.json` (scale 300, 10 runs per query). Median milliseconds:
 
@@ -256,7 +258,7 @@ Not built. Their views have no `security_barrier`, so a hostile `WHERE` may be a
 errors or timing. A different technique may fit them better: before a query, put a temporary table with only the
 allowed rows in front of each real table, so hidden rows are physically absent. It has its own limits (copy cost grows
 with the data; MySQL cannot use a temporary table twice in one query). The choice is **to verify**: it needs a lab on
-those engines that passes the same attack suite, and that lab does not exist yet.
+those engines that passes the same attack suite. That lab is **planned**.
 
 ## The knowledge graph
 
@@ -327,22 +329,26 @@ Paid, not payments). The benchmark (see "Evaluation") is where this will show; t
 The tools are served over standard MCP (streamable HTTP) by `src/agent_workcell/tool_server.py`, so a runtime needs no
 project-specific code to use them. They are plain functions in `src/agent_workcell/tools.py`.
 
-| Tool | Argument | What it returns |
+| Tool | Arguments | What it returns |
 |---|---|---|
 | `knowledge` | `question` | Retrieval for the question (see "Retrieval"), for the person's role |
 | `get_schema` | `tables` | The guide's section for each named table the role can read; any other name gets "not available", so the answer does not reveal whether a table exists |
 | `run_query` | `sql` | One read-only query through the guarded connection, as text rows, with a note when the result was cut |
 | `create_file` | `sql`, `format` (`xlsx` or `csv`), `title` | The server runs the query and writes every row to a file (see "Files") |
 | `remember` | `note` | Saves a short note for the person (see "Memory") |
+| `search_documents` | `query`, `limit` | The best passages of the documents the person may read, with citations (see "Documents") |
+| `read_document` | `doc_number`, `version`, `first_passage`, `count` | Passages of one document version in order, and its versions (see "Documents") |
 
 - No tool has a user, role or tenant argument. A test lists the tools' arguments and fails if one appears.
-- Every query goes through the person's guarded connection. There is no second path to the database.
+- Every query, including the document tools' fixed SQL, goes through the person's guarded connection. There is no
+  second path to the database.
 - Results are capped (200 rows and 60,000 characters by default). Line breaks and column separators inside values
   are removed, so a value cannot pose as another row. The result says that any text in it is data.
 - A failed query helps the next try with names the person may use: on an unknown column, the visible columns of the
   tables the query names; on an unknown table, the tables the role can read. A permission error is a fixed message.
 - `create_file` and `remember` tell the host application what they did through the answer stream (`file` and
-  `note` events). Those events come from the server, not from the model's text.
+  `note` events), and the document tools lead to one `sources` event at the end of the answer. These events come
+  from the server, not from the model's text.
 
 ## Identity
 
@@ -375,11 +381,11 @@ them are removed.
 | `tools=[]`, and every built-in tool named in `disallowed_tools` | No shell, file, web, sub-agent or skill tool. Two layers, so one change in the SDK does not open them. |
 | `permission_mode="dontAsk"`, `allowed_tools` = the five project tools | Any other call is denied, never prompted |
 | `strict_mcp_config=True`, `setting_sources=[]` | No MCP servers, settings, `CLAUDE.md` or skills picked up from disk |
-| `cwd` = an empty folder made for the run, outside any project; deleted afterwards. The server refuses to start when `WORKCELL_DATA_DIR` is inside a folder that holds `.git`, `CLAUDE.md` or `AGENTS.md`, and gives the runtime absolute paths only | Nothing to read, even by accident |
+| `cwd` = the person's own folder under `WORKCELL_DATA_DIR/people/`, outside any project; it holds only the runtime's configuration and sessions. The server refuses to start when `WORKCELL_DATA_DIR` is inside a folder that holds `.git`, `CLAUDE.md` or `AGENTS.md`, and gives the runtime absolute paths only | Nothing to read, even by accident |
 | `max_turns`, `max_budget_usd`; the server adds a time limit | Every run is bounded |
 | Inherited environment variables blanked, except a short list the CLI needs | The runtime never receives the database URLs, passwords or the host key |
 | The system prompt is passed as a file; the person's message on standard input | Neither appears on a command line |
-| `CLAUDE_CONFIG_DIR` = an empty folder inside the run's folder, deleted with it | The CLI does not use the server user's `~/.claude`: no personal sign-in, no account details for the model, no transcripts left behind. It needs `ANTHROPIC_API_KEY`. |
+| `CLAUDE_CONFIG_DIR` = a folder inside the person's folder | The CLI does not use the server user's `~/.claude`: no personal sign-in, no account details for the model, and each person's session transcripts stay in that person's folder. It needs `ANTHROPIC_API_KEY`. |
 
 Why the last row: with the server user's `~/.claude`, the CLI signs in with that person's Claude account, tells the
 model the account's email address (in a test run the model then searched the ERP's users for it), and keeps a full
@@ -409,10 +415,11 @@ The Claude Agent SDK runs the Claude Code CLI, a Node.js program, as a separate 
 property of the runtime, not a fault, but it has costs to plan for:
 
 - Each process needs CPU time and memory, and takes time to start before the model is called. These are **not
-  measured yet**.
-- Each run sends the whole system prompt, which includes the role's data guide, and the descriptions of the five tools
-  before the question. The system prompt is the same for every person with the same role, so the model provider can
-  cache it; whether the runtime's requests use that cache, and what it saves, is **to verify**.
+  measured**.
+- Each run sends the whole system prompt, which includes the role's data guide, and the descriptions of the seven tools
+  before the question. The system prompt is the same for every person with the same role, and Claude Code uses the
+  provider's prompt cache by default, so repeated parts are read from the cache. The audit records input and output
+  tokens but not cache tokens, so the saving per answer is not measured.
 - The runs load no `CLAUDE.md`, settings, skills or other MCP servers (`setting_sources=[]`, `strict_mcp_config`), so
   that part of the CLI's usual start-up does not apply.
 - Answers running at once are limited per person (`WORKCELL_CONCURRENT_ANSWERS`, 2 by default). With an API key there
@@ -424,8 +431,8 @@ the runtime to read a file, run a command, fetch a URL and read an environment v
 really happened, and a control test opens the file tool on purpose to prove the check catches a leak. They call a
 model and cost money, so they do not run in CI.
 
-Run on 2026-11-11 with `claude-agent-sdk` 0.2.180 and `claude-opus-5-5`, in the sign-in mode: the four containment
-tests and the control passed. **To verify:** the two checks that need the isolated mode (no account details reach
+Run on 2026-11-11, and again on 2026-11-13 with the seven tools, with `claude-agent-sdk` 0.2.180 and
+`claude-opus-5-5`, in the sign-in mode: the four containment tests and the control passed both times. **To verify:** the two checks that need the isolated mode (no account details reach
 the model; no transcript is left outside the run's folder) need an API key and have not been run. Without an API key,
 the isolated mode was confirmed only in part: the CLI could not find the sign-in, and no transcript was written.
 
@@ -440,7 +447,29 @@ real date. The system prompt tells the model to use the date in `<today>`; wheth
 
 - `POST /v1/answers`: the host application sends the principal and the question, with `Authorization: Bearer
   <WORKCELL_HOST_KEY>`. The answer streams back as server-sent events: `text`, `tool_call`, `tool_result`, `file`,
-  `note`, and a last `finished` event with the answer, the cleaned answer HTML, the cost and the token counts.
+  `note`, `sources`, and a last `finished` event with the answer, the cleaned answer HTML, the cost and the token
+  counts. An optional `conversation_id` continues a conversation (see "Conversations").
+### Conversations
+
+A follow-up question such as "and last month?" continues the conversation: the model sees the earlier questions and
+answers. The host application names each conversation with a `conversation_id` of its own choice (1 to 64 letters,
+digits, `-` or `_`). The server keeps the rest (`src/agent_workcell/conversations.py`):
+
+- It maps (person, conversation id) to a Claude Code session id that it chooses itself, a random UUID. The first
+  answer starts that session; every later answer resumes it. No session id comes from the model or the browser, and
+  none is sent to the host.
+- The key is the whole principal: role, user id and every attribute. The same conversation id from another person,
+  or from the same person after a change of role or supplier, is another conversation with an empty history.
+- Each person has their own folder, `WORKCELL_DATA_DIR/people/<hash of the principal>/`, which holds the runtime's
+  configuration and that person's session transcripts. Sessions are kept; nothing deletes them.
+- One conversation runs one answer at a time, so two runs never write the same session. Another conversation of the
+  same person may run at the same time, within the per-person limit.
+- Without a `conversation_id`, each answer is a new session.
+
+Checked by `tests/security/test_conversations.py` with the scripted runtime, and on 2026-11-13 against the real
+runtime (`test_a_resumed_session_sees_the_earlier_question`, sign-in mode, `claude-opus-5-5`): the resumed session
+named the word the first run was asked to remember.
+
 - `POST /v1/files/{file_id}`: a file that an answer built. The body names the principal; only the owner gets it.
 - `POST /v1/memory` and `POST /v1/memory/clear`: the person's notes, and deleting them.
 - `/mcp`: the tool server, for the runtime on the same machine.
@@ -516,7 +545,7 @@ answers running at once (2).
 - The cost check reserves the per-answer cap: the cost spent today, plus the cap for each running answer and for the
   new one, must fit under the daily limit. So the daily limit holds even if every running answer reaches its cap.
 - An answer whose cost is unknown (for example one stopped by the time limit) counts at the full per-answer cap.
-- Spending is read from the audit log; answers running now are counted in the server. A person over a limit gets HTTP
+- Spending is read from the audit log; answers in progress are counted in the server. A person over a limit gets HTTP
   429 with the reason.
 - A limit of zero or less, or a daily cost limit below the per-answer cap, stops the service at start-up.
 - There is no limit across all people with an API key (**planned**). In the local sign-in mode, one answer runs at a
@@ -587,14 +616,203 @@ answer and $1.50 in total.
 - The supplier user's answer was right but hedged: the model did not know that "Meridian Works" is the company that
   owns the ERP. The reference knowledge has no fact for that (**planned**).
 
-The full case file with repeats is ready to run; see [roadmap.md](roadmap.md) ("Not proven yet").
+The full case file with repeats is ready to run; see [roadmap.md](roadmap.md) ("Not proven (to verify)").
+
+## Documents
+
+People ask about documents as well as records: what an agreement says about payment terms, whether a delivery came
+with a quality certificate, how two versions of a policy differ. Document text is large and free, so here retrieval
+is the right tool. The design keeps the project's split: the agent decides when to search, what to search for and
+whether to read more; the environment reads the files, keeps the passages, searches them and enforces access.
+
+Status: the tables, their access rules and made-up data for the reference ERP are built and tested, and so are upload,
+the job queue, reading text, Markdown and CSV files, embeddings from OpenAI or OpenRouter, hybrid search through the
+guard, and the agent's document tools (`src/agent_workcell/documents/`, `tools.py`).
+
+### Where documents live
+
+Documents live in the business database, in tables the policy lists like any other. The data guard therefore
+decides who reads a document, a version or a passage, with the same grants and views, and the same attack suite and
+oracle test it.
+
+Why not a separate vector database such as Qdrant: it has no row rules inside a collection. Access would be a filter
+that the server adds to every query, so one code path that forgets the filter would leak another person's documents.
+Grants cover every access path. What it costs: vectors are stored in PostgreSQL with the pgvector extension, so the
+database image must include it (Compose uses `pgvector/pgvector:pg17-trixie`), and search speed on large document
+sets is **to verify**. A dedicated vector database may search faster at very large scale.
+
+### Tables
+
+| Table | One row is | Notes |
+|---|---|---|
+| `documents` | The document people see | `audience`, `supplier_id` and `purchase_order_id` are what the policy's row rules use |
+| `document_versions` | One uploaded file of the document | File name, type, size, SHA-256, processing status, and the reason when reading failed. `storage_key` is hidden from the agent. |
+| `document_chunks` | One passage of a version's text | Page number (empty for files without pages) and section, so an answer can cite them. Only `ready` versions have passages. `search_text` is computed by the database for full-text search. |
+| `document_chunk_embeddings` | One passage's embedding by one model | See "Embeddings". Follows its passage's access. |
+
+In the reference ERP these tables are in `reference_erp/documents.sql`. Their link columns belong to the host
+application: another deployment links documents to its own records and writes its own row rules over them. The
+document code needs `document_versions` and `document_chunks` with the columns above, in the policy's schema, and a
+`documents` table whose `id` they point to. How a deployment installs these tables is **to verify**.
+
+### Upload and processing
+
+```mermaid
+flowchart LR
+    H[Host application] -->|host key, file, document id, uploader| S[Answer server]
+    S -->|file, under a key made of numbers and its hash| F[(Data folder)]
+    S -->|documents role: version 'pending', job| D[(Business database)]
+    W[Worker] -->|takes a job: SKIP LOCKED| D
+    W -->|reads| F
+    W -->|documents role: passages, version 'ready' or 'failed'| D
+```
+
+1. **Upload.** The host application sends `POST /v1/documents/{document_id}/versions` with the host key. The body is
+   the file; `X-File-Name` and `X-Uploaded-By` give its name and the uploading person's user id. The host decides who
+   may upload and what a document is attached to; the model never does. The server streams the body to disk with a
+   size cap (`WORKCELL_DOCUMENT_MAX_BYTES`, 100 MB by default) and its SHA-256, and refuses a file type that has no
+   reader. It then adds the next version with status `pending` and a job, in one transaction. The file is stored under
+   `<document id>/<version number>/<sha256>`; its name is kept only as data and never becomes part of a path.
+2. **Processing.** A worker (`python -m agent_workcell.documents work`) takes the next due job with
+   `FOR UPDATE SKIP LOCKED`, so several workers never take the same one, and sets the version to `processing`. It
+   reads the file line by line, splits it into passages, and writes them with the status `ready` in one transaction:
+   a version never has half its passages.
+3. **Failures.** A file that cannot be read (not UTF-8, binary, no text, a type with no reader) fails at once, with a
+   message people can read in `document_versions.error`. Any other error, such as a database or disk fault, is tried
+   again after 30, then 60 seconds; after three attempts the version fails with a fixed message. The detail goes to
+   the worker's log and to the job table, which the agent cannot read. A job whose worker stopped is taken again once
+   its lease (10 minutes) has run out. A worker writes only while it holds the job's lock and the job is still its own
+   attempt, so two workers never both write a version's passages.
+
+Why a job table and not a queue service: PostgreSQL is already there, `SKIP LOCKED` gives each job to one worker, and
+a job is created in the same transaction as its version, so neither exists without the other. What it costs: workers
+poll the table every 2 seconds when idle, and throughput beyond one database is not measured.
+
+**The documents role.** The upload and the worker write as their own database role. It may add versions, update a
+version's `status` and `error` (no other column), add passages, and use its job table. It cannot read any other
+table, read a passage back, delete anything, or change a document and so its access. `documents check`, and the answer
+server at start-up, compare the role's real rights with this list and stop on any difference.
+`python -m agent_workcell.documents plan` prints the SQL that installs it, for an administrator to review.
+
+**Reading.** Plain code per format, no model call: the same file always gives the same passages.
+
+| Format | Blocks | Section |
+|---|---|---|
+| Text (`.txt`) | Paragraphs, split at blank lines | None |
+| Markdown (`.md`) | Paragraphs | The path of headings above it, such as `Terms > Payment`. A `#` inside a code block is not a heading. |
+| CSV (`.csv`) | Rows written as `column: value` pairs, grouped | The rows it holds, such as `Rows 2 to 31` (the header is row 1) |
+
+Paragraphs of one section are joined into passages of up to 1,500 characters; a longer paragraph is split at a
+sentence end, or else at a space. A passage never spans two sections or two pages. A line is read at most 64,000
+characters at a time, so a file with no line breaks is read in parts too.
+
+### Who can read what
+
+The reference policy (`reference_erp/policy.toml`) gives each document an audience: `admins`, `staff` (admins and
+buyers) or `supplier` (staff and the users of the document's supplier). A buyer does not read the documents of
+another buyer's orders. A supplier user reads a document of an order only once that order has been sent. Versions,
+passages and embeddings follow their document. `tests/security/test_documents.py` names these rules one by one.
+
+### Embeddings
+
+An embedding is a list of numbers that stands for a text's meaning; texts that mean similar things get similar
+lists, even when they use different words. The worker embeds each passage, together with its section heading, while
+it writes the passages, in the same transaction.
+
+The provider is a setting, not code: `WORKCELL_EMBEDDING_PROVIDER` is `openai`, `openrouter` or `fake`, with
+`WORKCELL_EMBEDDING_MODEL`, `WORKCELL_EMBEDDING_DIMENSIONS` and the provider's key (`OPENAI_API_KEY` or
+`OPENROUTER_API_KEY`). Both providers offer the same embeddings endpoint, so one small client
+(`documents/embed.py`, built on `httpx2`, which the MCP SDK installs) serves both. A provider with a missing model, size
+or key stops the worker; the other provider's key is never used instead. Every answer is checked: one vector per
+passage, each with exactly the stated dimensions, every value a number. Leave the provider out to turn embeddings off;
+search then uses words only.
+
+Models differ in their number of dimensions, so `document_chunk_embeddings.embedding` has none, and each row names its
+model. A search compares only vectors of the model it asks with, and of that model's dimensions, so vectors of two
+models never mix. Changing the model leaves the old vectors in place and unused.
+
+The `fake` provider hashes words into 64 numbers. It costs nothing and needs no network, so tests and the seed data
+use it. It matches shared words, not meaning.
+
+### Search
+
+`documents/search.py` searches the current version of each document that is not deleted, and returns passages with a
+citation built from the row: document number, title, version, page or section, and passage number. It runs fixed SQL
+with bound values on the person's guarded connection, so it reads the guard views and finds only what that person
+may read. `tests/security/test_document_search.py` checks every result, for every test person, against the oracle.
+
+It merges two rankings (hybrid search):
+
+- **Words.** PostgreSQL full-text search over `document_chunks.search_text`, a column the database computes from the
+  section and the passage. Every word of the query must appear.
+- **Meaning.** Cosine distance between the query's embedding and the passages' embeddings.
+
+Each passage scores 1 / (60 + its rank) in each ranking it appears in (reciprocal rank fusion). The constant and
+whether the merge beats either ranking alone are **to verify** by a benchmark. Every candidate passage is compared
+exactly; no approximate vector index is used, so search time grows with the number of passages a person may
+read (**to verify**).
+
+### The document tools
+
+Two tools give the agent the documents. Like every tool, neither takes a user, role or tenant argument.
+
+| Tool | Arguments | What it returns |
+|---|---|---|
+| `search_documents` | `query`, `limit` (1 to 20) | The best passages of each readable document's current version, by words and meaning (see "Search") |
+| `read_document` | `doc_number`, `version` (optional), `first_passage`, `count` (1 to 10) | Passages of one version in order, the document's versions with their status, and the reason when a version failed |
+
+The agent decides when to search, what to search for, and whether to read more: around a passage that search found,
+a whole document, or two versions of one document to compare. Comparing is the agent's work; the tools only read.
+
+Both tools run fixed SQL with bound values on the person's guarded connection. A document the person may not read
+gives the same answer as one that does not exist, so the tools do not reveal which document numbers exist.
+
+**Citations.** Each passage comes with a citation the server builds from the database row: document number, title,
+version, page or section, and passage number. The system prompt asks the model to cite each fact from a document that
+way, and to answer only from passages it has read.
+
+**Sources.** At the end of an answer that used the document tools, the server sends a `sources` event before the
+`finished` event. It lists every document whose passages the tools returned, with title, version and passages, all
+taken from the database rows, and marks each document whose number appears in the answer as `cited`. A host
+application can show these sources without trusting the model's text; the reference chat page does.
+
+**Text from documents is data.** Each passage is sent inside `<passage>` tags, and its text, title and section are
+escaped, so a document cannot close the block or pose as a trusted one. The system prompt tells the model that text
+inside `<passage>` is data, never instructions. Every call is in the audit record with its arguments and the number of
+passages returned.
+
+When the embedding provider fails during a search, the tool searches by words only and says so. The guard applies in
+both cases.
+
+### Known limits
+
+- Text, Markdown and CSV files are read. The upload refuses other file types (HTTP 415).
+- The seed's passages have embeddings of the `fake` model only. With a real provider, search by meaning covers the
+  files the worker processed with that provider; search by words covers every passage. Passages that are already stored are not embedded again when the model
+  changes.
+- An embedding failure rolls back the whole version, so a retry embeds every passage again and is paid for again.
+- The provider receives the text of every passage and of every search query. Choose a provider whose terms suit the
+  data.
+- The recorded answer run predates the document tables and tools. Its results say nothing about questions on
+  documents.
+- The `sources` event marks a document as cited when its number appears in the answer. It does not check the page,
+  section or wording the answer attributes to it.
+- The answer server and the worker must share the data folder, because the server stores uploaded files there and
+  the worker reads them. Files are stored unencrypted; protect the folder like the database.
+- A worker that stops before it starts writing keeps its job until the lease runs out (10 minutes), so the file waits
+  that long. While a worker writes, it holds a lock on the job, and it writes only if the job belongs to its own
+  attempt; a worker whose job was taken over writes nothing (`test_a_worker_whose_job_was_taken_over_writes_nothing`).
+- If the database fails at the moment an upload commits, the stored file can stay on disk with no version pointing to
+  it.
+- Seeded versions with status `pending` or `processing` have no job and no file. They show those states to the agent;
+  no worker processes them.
 
 ## What is deliberately left out
 
 | Left out | Why |
 |---|---|
 | Intent classifiers, routers, multi-agent hand-offs | They split the meaning of one question across stages |
-| Chunking, embeddings, vector search, reranking | The reference knowledge is small enough to send whole, and questions are full of identifiers. To revisit when a benchmark shows that word matching or the size of the guide is the problem |
+| Embeddings, vector search and reranking for the knowledge graph | The reference knowledge is small enough to send whole, and questions are full of identifiers. To revisit when a benchmark shows that word matching or the size of the guide is the problem. Documents are different: their text is large and free, and they have hybrid search (see "Documents") |
 | Letting the agent read the host application's source | Host-specific, and it widens what an injected instruction can reach |
 | Reports where the model types the numbers | The server runs the SQL and writes the file; the model never retypes data |
 | A spreadsheet library | An `.xlsx` with text, number and date cells is a few XML parts; the standard library writes them |
@@ -612,15 +830,16 @@ Answered:
   each table's total row count. It cannot read row data this way. This is a known limit; see
   [security-model.md](security-model.md).
 
-Still open:
+Open:
 
 - Whether the Claude adapter's isolated mode holds against the real runtime (needs an API key; see "The agent
   runtime").
 - What one CLI process per answer costs in start-up time, memory and CPU, and how many answers a server can run at
-  once. Not measured.
-- Whether the built files open cleanly in Excel and LibreOffice (checked so far by reading the XML and with
+  once. Not measured. The process per answer is also what keeps people apart: each run has its own process, folder
+  and configuration, so nothing of one person's run can reach another person's answer.
+- Whether the built files open cleanly in Excel and LibreOffice (checked by reading the XML and with
   `openpyxl`).
-- Whether word matching is enough for retrieval. The first small benchmark run gave no sign against it, but 7
+- Whether word matching is enough for retrieval. The recorded benchmark run gave no sign against it, but 7
   graded answers cannot show it.
 - What happens when the guide no longer fits in the system prompt. The agent would then have to find the knowledge
   through `get_schema` and `knowledge`, or a selection step (retrieval) would be needed. Not tested: the reference

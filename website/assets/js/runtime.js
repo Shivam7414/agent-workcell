@@ -1,5 +1,5 @@
 // Claude Code section: when the figure comes into view, its built-in tools are struck out one by one,
-// then the five project tools appear. The delays are set here; the motion itself is in CSS.
+// then the seven project tools appear. The delays are set here; the motion itself is in CSS.
 
 export function initRuntime(root) {
   const removed = [...root.querySelectorAll("[data-rt-wall] li")];
