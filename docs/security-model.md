@@ -91,7 +91,13 @@ reference ERP carries hostile text in its records so that tests can check this.
   real date can differ from the one in `<today>`.
 - **The sign-in mode (`WORKCELL_CLAUDE_ACCOUNT_LOGIN=1`) is for local trials only.** In it, the runtime uses the
   server user's Claude Code sign-in: the account's email address reaches the model, and a transcript of every run,
-  data included, stays in `~/.claude/projects`. The default isolated mode avoids both.
+  data included, stays in `~/.claude/projects`. The default isolated mode avoids both. Anthropic also does not allow
+  products built on the Agent SDK to run on a claude.ai sign-in without its approval, so the server keeps the mode to
+  one person: it starts only on a loopback address and runs one answer at a time. A service for other people must use
+  `ANTHROPIC_API_KEY`; without it the server does not start.
+- **One runtime process per answer.** Each answer starts a Claude Code CLI process (Node.js). Many answers at once
+  mean many processes. Answers running at once are limited per person, but not yet across the whole server, so a
+  burst of people can use up the host's CPU and memory. A server-wide limit is planned.
 - **The run's token reaches the runtime process** (in its MCP configuration), though not the model. Anyone who can
   read that process's memory during the run can call the tools as that person until the run ends. The token is
   random, lives only for one answer, and works only against this server.

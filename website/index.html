@@ -475,6 +475,8 @@
               <div><dt>Nothing from disk</dt><dd>No settings, MCP servers, <code>CLAUDE.md</code> or skills. Each run gets a new, empty folder.</dd></div>
               <div><dt>No server secrets</dt><dd>Database credentials and the host key are removed from its environment. The run token stays in the MCP headers.</dd></div>
               <div><dt>Bounded</dt><dd>Turn and cost limits per run, plus a server time limit.</dd></div>
+              <div><dt>API key only</dt><dd>Products may not run on a claude.ai sign-in. The sign-in mode is a local trial: 127.0.0.1, one answer at a time.</dd></div>
+              <div><dt>One process per answer</dt><dd>Each answer starts a Claude Code CLI process (Node.js). Plan CPU, memory and API cost for it.</dd></div>
             </dl>
             <p class="note"><span class="tag tag--plain">Checked by hand</span> 2026-11-11, <code>claude-agent-sdk</code> 0.2.180, <code>claude-opus-5-5</code>, sign-in mode: file read, shell command, URL fetch and environment read were all blocked. A deliberate leak in the control test was caught.</p>
             <p class="note"><span class="tag tag--plain">To verify</span> Isolated-mode checks (no account details, no transcript) need an API key and have not run.</p>
@@ -809,6 +811,7 @@
             <li><strong>Exploration depth.</strong> Most recorded answers used one query.</li>
             <li><strong>Word matching.</strong> Seven graded answers cannot show it is enough.</li>
             <li><strong>Isolated runtime mode.</strong> Two checks need an API key.</li>
+            <li><strong>Cost per answer process.</strong> Start-up time, memory and CPU of each CLI process.</li>
           </ul>
           <a class="btn btn--line btn--small" href="https://github.com/Shivam7414/agent-workcell/blob/main/docs/roadmap.md" rel="noopener">Read the status page</a>
         </div>

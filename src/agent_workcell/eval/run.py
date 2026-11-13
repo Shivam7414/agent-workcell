@@ -39,7 +39,7 @@ import psycopg
 import uvicorn
 from psycopg import sql
 
-from agent_workcell.config import ConfigError, Settings, load_settings
+from agent_workcell.config import ConfigError, Settings, check_claude_access, load_settings
 from agent_workcell.eval import grade
 from agent_workcell.eval.cases import Case, CaseFile, load_cases
 from agent_workcell.guard import GuardedConnection, GuardError, Limits, Principal, QueryError
@@ -387,6 +387,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.runtime == "claude":
             from agent_workcell.runtime.claude import ClaudeRuntime
 
+            check_claude_access(settings)
             runtime = ClaudeRuntime(account_login=settings.claude_account_login)
             planned = len(case_file.cases if not args.only else args.only.split(",")) * args.repeats
             print(f"Up to {planned} answers, at most ${args.answer_max_usd:.2f} each; the run stops before passing "

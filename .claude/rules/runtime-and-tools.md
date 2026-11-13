@@ -30,6 +30,10 @@ Status: **built.** Code: `src/agent_workcell/tools.py`, `tool_server.py`, `runti
 - Give the runtime its own empty configuration folder inside the run's folder (`CLAUDE_CONFIG_DIR` for Claude Code).
   The server user's own configuration brings a personal sign-in, account details the model can read, and
   transcripts of every run left on disk.
+- Products run on an API key. The Claude Code sign-in mode is for one person on their own computer: a loopback
+  address only and one answer at a time across the server (`config.check_claude_access`,
+  `AnswerService.limit_refusal`). Never widen it, and never pass a subscription token (`CLAUDE_CODE_OAUTH_TOKEN`) to
+  the runtime.
 - A conformance test must prove the run really happened (an answer, no failure), or it can pass for the wrong reason.
 - Pin the runtime's version. Its flags and behaviour change between versions. After changing the Claude adapter or the
   pinned `claude-agent-sdk` version, run `tests/runtime_conformance` by hand and say so in your reply.

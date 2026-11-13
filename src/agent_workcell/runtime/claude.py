@@ -16,7 +16,11 @@ only the project's tools over MCP:
   ~/.claude/projects. Isolated, it needs ANTHROPIC_API_KEY.
 
 `account_login=True` turns the isolation off, for trying the server locally with a Claude Code sign-in. Never use it
-on a server: the account's email reaches the model and transcripts stay on disk.
+on a server: the account's email reaches the model and transcripts stay on disk, and Anthropic does not allow
+products to run on a claude.ai sign-in without its approval. config.check_claude_access keeps the mode on a loopback
+address and requires an API key otherwise; the answer service runs one answer at a time in it.
+
+The SDK starts the Claude Code CLI (a Node.js program) as a new process for every run.
 
 Whether this holds is checked by hand with tests/runtime_conformance, against the pinned SDK version.
 """

@@ -40,7 +40,7 @@ from starlette.routing import Mount, Route
 
 from agent_workcell import prompt, render
 from agent_workcell.audit import AnswerRecord, AuditLog
-from agent_workcell.config import ConfigError, Settings, load_settings
+from agent_workcell.config import ConfigError, Settings, check_claude_access, load_settings
 from agent_workcell.files import FileStore
 from agent_workcell.guard import GuardedConnection, GuardError, Limits, Principal
 from agent_workcell.guard.doctor import check, errors
@@ -74,6 +74,9 @@ class AnswerService:
         each running answer and for the new one, so the daily cost limit holds even if they all reach the cap."""
         settings, person = self.settings, str(principal.user_id)
         running = self.running.get(person, 0)
+        if settings.claude_account_login and sum(self.running.values()) > 0:
+            # The sign-in mode is one person's Claude Code sign-in: never several agent runs at once on it.
+            return "The server is in the local sign-in mode and runs one answer at a time. Try again shortly."
         if running >= settings.concurrent_answers:
             return "Another answer for you is still running. Wait for it to finish."
         count, cost = self.audit.usage_since(person, _day_start(), unknown_cost=settings.answer_max_usd)
@@ -318,9 +321,11 @@ def main() -> int:
         except ImportError:
             raise ConfigError("The Claude runtime needs the 'claude' extra: pip install 'agent-workcell[claude]'")\
                 from None
+        check_claude_access(settings)
         if settings.claude_account_login:
-            print("WORKCELL_CLAUDE_ACCOUNT_LOGIN=1: the runtime uses this computer's Claude Code sign-in. The "
-                  "account's email reaches the model and transcripts stay in ~/.claude. For local trials only.",
+            print("WORKCELL_CLAUDE_ACCOUNT_LOGIN=1: the runtime uses this computer's Claude Code sign-in, for a local "
+                  "trial by one person. One answer runs at a time. The account's email reaches the model and "
+                  "transcripts stay in ~/.claude. A service for other people must use ANTHROPIC_API_KEY.",
                   file=sys.stderr)
         service = build_service(settings, ClaudeRuntime(account_login=settings.claude_account_login))
     except (ConfigError, OSError, psycopg.Error) as error:

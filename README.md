@@ -113,9 +113,19 @@ with GuardedConnection(agent, binder, policy, person) as connection:
 ```
 
 Run the answer server with the Claude runtime. Answers call a model and cost money. It reads `ANTHROPIC_API_KEY` and
-the settings in `.env`. The runtime gets its own empty configuration folder for each answer, so it never uses a
-personal Claude Code sign-in. For a local trial with your own sign-in instead, set `WORKCELL_CLAUDE_ACCOUNT_LOGIN=1`;
-the account's email address then reaches the model, so never use it on a server.
+the settings in `.env`, and does not start without the key. The runtime gets its own empty configuration folder for
+each answer, so it never uses a personal Claude Code sign-in.
+
+Before you run it for other people:
+
+- **Use an API key.** Anthropic does not allow products built on the Claude Agent SDK to run on a claude.ai sign-in
+  without its approval ([Agent SDK overview](https://code.claude.com/docs/en/agent-sdk/overview)).
+  `WORKCELL_CLAUDE_ACCOUNT_LOGIN=1` uses your own Claude Code sign-in for a local trial only: the server then listens
+  on 127.0.0.1 only, runs one answer at a time, and your account's email address reaches the model.
+- **Each answer starts a process.** The runtime is the Claude Code CLI, a Node.js program, started once per answer.
+  Every run sends the system prompt (with the role's data guide) and the tool descriptions again. Answers running at
+  once are limited per person, not yet per server. Plan CPU, memory and API cost for that; see
+  [docs/architecture.md](docs/architecture.md), "One process per answer".
 
 ```bash
 pip install -e ".[claude]"

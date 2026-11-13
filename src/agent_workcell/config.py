@@ -115,6 +115,28 @@ def check_data_dir(data_dir: Path) -> None:
                               f"{', '.join(found)}). Choose a folder outside it, for example ~/.agent-workcell.")
 
 
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+
+def check_claude_access(settings: Settings, environ: Mapping[str, str] | None = None) -> None:
+    """How the Claude runtime signs in. Called before the Claude runtime starts.
+
+    The default is an API key. Anthropic does not allow products built on the Claude Agent SDK to offer claude.ai
+    login or its rate limits unless Anthropic has approved it, so a service for other people must use an API key.
+    The sign-in mode is for one person trying the project on their own computer: it must listen on a loopback
+    address only (the answer service also runs one answer at a time in it; see server.py)."""
+    env = os.environ if environ is None else environ
+    if settings.claude_account_login:
+        if settings.host not in LOOPBACK_HOSTS:
+            raise ConfigError(f"WORKCELL_CLAUDE_ACCOUNT_LOGIN=1 is for a local trial on your own computer, so "
+                              f"WORKCELL_HOST must be 127.0.0.1, not {settings.host!r}. A service that other people "
+                              "use must run with ANTHROPIC_API_KEY.")
+        return
+    if not env.get("ANTHROPIC_API_KEY", "").strip():
+        raise ConfigError("ANTHROPIC_API_KEY is missing. The Claude runtime needs an API key. For a local trial "
+                          "with your own Claude Code sign-in, set WORKCELL_CLAUDE_ACCOUNT_LOGIN=1 instead.")
+
+
 def check_limits(settings: Settings) -> None:
     """A limit of zero would mean "no limit" to some readers and "nothing" to others. Refuse it."""
     positive = ("answer_timeout_s", "answer_max_usd", "max_turns", "daily_answers", "daily_usd", "concurrent_answers",

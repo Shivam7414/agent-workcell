@@ -386,6 +386,39 @@ model the account's email address (in a test run the model then searched the ERP
 transcript of every run, query results included, in `~/.claude/projects`. `WORKCELL_CLAUDE_ACCOUNT_LOGIN=1` turns the
 isolation off, for local trials with a Claude Code sign-in only.
 
+### An API key, not a Claude sign-in
+
+The Claude runtime runs on an Anthropic API key. Anthropic does not allow products built on the Claude Agent SDK to
+offer claude.ai login or its rate limits unless Anthropic has approved it
+([Agent SDK overview](https://code.claude.com/docs/en/agent-sdk/overview)). A service that other people use therefore
+runs with `ANTHROPIC_API_KEY` and is billed at API prices. The code holds to this:
+
+| Rule | Where | Why |
+|---|---|---|
+| The answer server and the evaluation harness refuse to start the Claude runtime without `ANTHROPIC_API_KEY` | `config.check_claude_access` | Fail closed: no silent fall-back to a sign-in |
+| A subscription token in the server's environment (`CLAUDE_CODE_OAUTH_TOKEN`) is blanked before the runtime starts | `runtime_env` (not in `KEEP_ENV`) | The isolated mode cannot run on a subscription by accident |
+| The sign-in mode (`WORKCELL_CLAUDE_ACCOUNT_LOGIN=1`) starts only when `WORKCELL_HOST` is a loopback address | `config.check_claude_access` | Nobody else can reach a server that runs on one person's sign-in |
+| In the sign-in mode, one answer runs at a time, across all people | `AnswerService.limit_refusal` | No parallel agent runs on one person's subscription |
+
+The cost of these rules: a local trial in the sign-in mode answers one question at a time, and a deployment needs an
+API account.
+
+### One process per answer
+
+The Claude Agent SDK runs the Claude Code CLI, a Node.js program, as a separate process for every answer. This is a
+property of the runtime, not a fault, but it has costs to plan for:
+
+- Each process needs CPU time and memory, and takes time to start before the model is called. These are **not
+  measured yet**.
+- Each run sends the whole system prompt, which includes the role's data guide, and the descriptions of the five tools
+  before the question. The system prompt is the same for every person with the same role, so the model provider can
+  cache it; whether the runtime's requests use that cache, and what it saves, is **to verify**.
+- The runs load no `CLAUDE.md`, settings, skills or other MCP servers (`setting_sources=[]`, `strict_mcp_config`), so
+  that part of the CLI's usual start-up does not apply.
+- Answers running at once are limited per person (`WORKCELL_CONCURRENT_ANSWERS`, 2 by default). With an API key there
+  is no limit across all people: a busy server runs as many CLI processes as there are answers in progress. A
+  server-wide limit is **planned**.
+
 Whether the profile holds against the real runtime is checked by hand with `tests/runtime_conformance/`. The tests ask
 the runtime to read a file, run a command, fetch a URL and read an environment variable. They check that the run
 really happened, and a control test opens the file tool on purpose to prove the check catches a leak. They call a
@@ -486,6 +519,8 @@ answers running at once (2).
 - Spending is read from the audit log; answers running now are counted in the server. A person over a limit gets HTTP
   429 with the reason.
 - A limit of zero or less, or a daily cost limit below the per-answer cap, stops the service at start-up.
+- There is no limit across all people with an API key (**planned**). In the local sign-in mode, one answer runs at a
+  time on the whole server; see "An API key, not a Claude sign-in".
 
 ## The answer as HTML
 
@@ -581,6 +616,8 @@ Still open:
 
 - Whether the Claude adapter's isolated mode holds against the real runtime (needs an API key; see "The agent
   runtime").
+- What one CLI process per answer costs in start-up time, memory and CPU, and how many answers a server can run at
+  once. Not measured.
 - Whether the built files open cleanly in Excel and LibreOffice (checked so far by reading the XML and with
   `openpyxl`).
 - Whether word matching is enough for retrieval. The first small benchmark run gave no sign against it, but 7

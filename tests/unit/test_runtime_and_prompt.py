@@ -9,10 +9,11 @@ import pytest
 
 from agent_workcell import prompt
 from agent_workcell.audit import AnswerRecord, AuditLog, ToolCallRecord
-from agent_workcell.config import ConfigError, load_settings
-from agent_workcell.guard import QueryResult
+from agent_workcell.config import ConfigError, check_claude_access, load_settings
+from agent_workcell.guard import Principal, QueryResult
 from agent_workcell.runtime import RunRequest
 from agent_workcell.runtime.claude import BUILT_IN_TOOLS, build_options, runtime_env
+from agent_workcell.server import AnswerService
 from agent_workcell.tools import format_result, guide_sections
 
 ROOT = Path(__file__).parents[2]
@@ -90,6 +91,48 @@ def test_the_claude_runtime_uses_its_own_empty_config_folder_inside_the_run(tmp_
     assert login.env["CLAUDE_CONFIG_DIR"] == "", "in login mode an inherited config folder is still not passed on"
 
 
+def test_the_claude_runtime_needs_an_api_key_unless_in_the_local_sign_in_mode():
+    settings = load_settings(FULL)
+    check_claude_access(settings, {"ANTHROPIC_API_KEY": "sk-test"})
+    for broken in ({}, {"ANTHROPIC_API_KEY": ""}, {"ANTHROPIC_API_KEY": "   "}, {"CLAUDE_CODE_OAUTH_TOKEN": "t"}):
+        with pytest.raises(ConfigError, match="ANTHROPIC_API_KEY is missing"):
+            check_claude_access(settings, broken)
+
+
+def test_the_sign_in_mode_only_listens_on_this_computer():
+    """The sign-in mode is one person's Claude Code sign-in. It must not serve other people."""
+    for host in ("127.0.0.1", "localhost", "::1"):
+        check_claude_access(load_settings({**FULL, "WORKCELL_CLAUDE_ACCOUNT_LOGIN": "1", "WORKCELL_HOST": host}), {})
+    for host in ("0.0.0.0", "10.0.0.5", "::", "erp.internal"):
+        settings = load_settings({**FULL, "WORKCELL_CLAUDE_ACCOUNT_LOGIN": "1", "WORKCELL_HOST": host})
+        with pytest.raises(ConfigError, match="must be 127.0.0.1"):
+            check_claude_access(settings, {"ANTHROPIC_API_KEY": "sk-test"})
+
+
+class NoUsage:
+    def usage_since(self, person, since, unknown_cost):
+        return 0, 0.0
+
+
+def limit_service(environ: dict) -> AnswerService:
+    """Only what limit_refusal reads: the settings, the running answers and the audit log's usage."""
+    fields = {name: None for name in AnswerService.__dataclass_fields__ if name not in ("names", "running")}
+    return AnswerService(**{**fields, "settings": load_settings({**FULL, **environ}), "audit": NoUsage()})
+
+
+def test_the_sign_in_mode_runs_one_answer_at_a_time_across_all_people():
+    first, second = Principal("buyer", 7, {"buyer_id": 7}), Principal("supplier_user", 16, {"supplier_id": 1})
+    sign_in = limit_service({"WORKCELL_CLAUDE_ACCOUNT_LOGIN": "1"})
+    assert sign_in.limit_refusal(first) is None
+    sign_in.running[str(first.user_id)] = 1
+    assert "one answer at a time" in sign_in.limit_refusal(second)
+    assert "one answer at a time" in sign_in.limit_refusal(first)
+
+    api_key = limit_service({})
+    api_key.running[str(first.user_id)] = 1
+    assert api_key.limit_refusal(second) is None, "with an API key, other people's answers still run in parallel"
+
+
 def test_the_account_login_mode_is_off_unless_asked_for():
     assert load_settings(FULL).claude_account_login is False
     assert load_settings({**FULL, "WORKCELL_CLAUDE_ACCOUNT_LOGIN": "true"}).claude_account_login is False
@@ -127,6 +170,12 @@ def test_the_runtime_gets_no_database_password_or_other_server_secret(tmp_path):
     for name in ("PATH", "ANTHROPIC_API_KEY", "TEMP"):
         assert name not in env, f"{name} is needed by the CLI and must be inherited unchanged"
     assert runtime_env({"Path": "x"}) == {}, "Windows spells PATH in any case"
+
+
+def test_a_claude_subscription_token_never_reaches_the_runtime(tmp_path):
+    """Products must not run on a claude.ai sign-in. The CLI's subscription token is blanked like any other secret."""
+    env = build_options(request(tmp_path), inherited_env={"CLAUDE_CODE_OAUTH_TOKEN": "subscription-token"}).env
+    assert env["CLAUDE_CODE_OAUTH_TOKEN"] == ""
 
 
 # Tool output

@@ -45,6 +45,9 @@ Everything else (TOML, SQLite, CSV, Excel files, HTML cleaning, password hashing
 - The Claude adapter's isolated mode against the real runtime: no account details reach the model, and no transcript
   is left outside the run's folder. These checks need an API key.
 - Whether the model always uses the date in `<today>` rather than the real date the runtime adds.
+- What one Claude Code CLI process per answer costs: start-up time, memory and CPU, and how many answers one server can
+  run at once. Not measured. Whether the runtime's requests use the provider's prompt cache for the system prompt is
+  also unchecked.
 - Whether the built files open cleanly in Excel and LibreOffice. So far they are checked by reading the XML back and
   with `openpyxl`.
 - Whether word matching is enough for retrieval. The recorded answer run is too small to tell.
@@ -72,4 +75,5 @@ Everything else (TOML, SQLite, CSV, Excel files, HTML cleaning, password hashing
 | A plain model-API tool loop as a benchmark baseline | To show what reusing an agent runtime adds |
 | Charts built by the server | Same rule as files: the model never types the data |
 | Editing single memory notes | Today a person can list their notes and delete all of them |
+| A server-wide limit on answers running at once | Each answer starts a Claude Code CLI process; today only the per-person limit bounds them (the local sign-in mode already runs one at a time) |
 | More runtime adapters | Only when there is a concrete need |
