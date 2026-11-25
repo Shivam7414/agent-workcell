@@ -1,9 +1,10 @@
 /* Design tokens. Every colour, size and duration on the site comes from here.
 
-   The palette is the palette of a real workcell:
-     blue    engineered and trusted: the parts this project builds
-     orange  the reused agent, and anything untrusted or refused
-     yellow  guarding
+   The page is drawn like the two isometric scenes: flat colour, one ink outline, a flat offset shadow.
+   The colours carry one meaning each, the same as in the scenes and the favicon:
+     orange  Claude Code, the reused agent
+     blue    the parts this project builds around it
+     yellow  the data guard
      cyan    data that was allowed through
 */
 
@@ -29,67 +30,56 @@
   color-scheme: light;
 
   /* Surfaces */
-  --ink-0: #f4f5f8;
-  --ink-1: #ffffff;
-  --ink-2: #f0f2f6;
-  --ink-3: #e7eaf1;
+  --paper: #f4f5f8;
+  --card: #ffffff;
+  --soft: #e9ecf2;
 
   /* Lines */
-  --line: #e2e5ec;
-  --line-2: #d2d7e1;
-  --line-3: #a9b1c1;
+  --line: #dde1e9;
+  --line-strong: #b4bbc9;
 
-  /* Text */
+  /* Text and outline */
   --text: #0b0d12;
   --text-2: #434a5a;
-  --text-3: #687083;
+  --text-3: #636b7e;
 
   /* Meaning */
+  --orange: #ff5b24;
   --blue: #1f44ff;
-  --blue-soft: rgba(31, 68, 255, 0.08);
-  --accent: var(--blue);
-  --cyan: #0a8fb0;
-  --cyan-fill: #19c3e6;
-  --cyan-soft: rgba(25, 195, 230, 0.14);
-  --amber: #d9480f;
-  --orange-fill: #ff5b24;
-  --amber-soft: rgba(255, 91, 36, 0.1);
   --yellow: #ffc400;
+  --cyan: #19c3e6;
+  --cyan-soft: #c9f1fa;
+  --grey: #cdd3de;
 
-  /* Chart series, checked for colour-vision separation on the light surface */
-  --series-guarded: #1f44ff;
-  --series-plain: #e8590c;
-
-  --shadow: 0 1px 0 rgba(11, 13, 18, 0.03), 0 28px 56px -32px rgba(24, 36, 90, 0.28);
+  /* The flat shadow under a card, the same tint as the shadow under a scene's floor */
+  --shade: rgba(24, 36, 90, 0.1);
 
   /* Type */
   --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
   --mono: "Martian Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
 
   --step--2: 0.74rem;
-  --step--1: 0.84rem;
+  --step--1: 0.86rem;
   --step-0: 1.0625rem;
   --step-1: 1.25rem;
-  --step-2: clamp(1.4rem, 1.1rem + 1vw, 1.75rem);
-  --step-3: clamp(2.1rem, 1.2rem + 3.3vw, 3.7rem);
-  --step-4: clamp(2.7rem, 1.2rem + 4.6vw, 4.9rem);
+  --step-2: clamp(1.9rem, 1.2rem + 2.3vw, 2.9rem);
+  --step-3: clamp(2.7rem, 0.9rem + 4.4vw, 4.6rem);
 
   /* Space */
   --gutter: clamp(20px, 4.4vw, 64px);
-  --page: 1240px;
-  --section: clamp(48px, 6vw, 84px);
+  --page: 1200px;
+  --section: clamp(64px, 8vw, 112px);
 
   /* Shape */
   --r-1: 8px;
   --r-2: 14px;
-  --r-3: 28px;
+  --r-3: 22px;
+  --ink: 1.5px solid var(--text);
 
   /* Motion */
   --ease: cubic-bezier(0.22, 0.8, 0.24, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --fast: 160ms;
-  --mid: 420ms;
-  --slow: 900ms;
 
   --nav-h: 64px;
 }

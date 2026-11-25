@@ -1,7 +1,7 @@
 // The workcell, drawn as a live isometric scene.
 //
-// mode "play":    the arm carries one question through the cell, in a loop. Used by the hero.
-// mode "explore": the cell stands still and each part can be selected. Used by the architecture section.
+// mode "play":    the arm carries one question through the cell, in a loop. Used by "How it works".
+// mode "explore": the cell stands still and each part can be selected.
 //
 // Every object stands for a real part of the project. The names match docs/architecture.md.
 
@@ -41,6 +41,11 @@ const KEYS = [
   [11.3, AT.out], [11.7, AT.out], [12.9, AT.rack], [13.3, AT.rack], [14.4, HOME], [LOOP, HOME],
 ];
 const STEP_AT = [0, 3.0, 5.6, 7.9, 11.0];
+// With reduced motion a step is one still frame, taken at the moment that shows it.
+const STILL_AT = [1.3, 4.9, 6.6, 9.3, 12.2];
+
+// How long each step of the loop lasts, in seconds at speed 1.
+export const STEP_SECONDS = STEP_AT.map((start, i) => (STEP_AT[i + 1] ?? LOOP) - start);
 
 export const PARTS = [
   { id: "host", label: "Host application", a: [-0.6, 6.7, 0.55], d: [-44, 40] },
@@ -163,7 +168,7 @@ function card(st, x, y, z, stripe, tagged) {
   if (tagged) st.box(x + 0.18, y + 0.06, z + 0.07, 0.24, 0.24, 0.1, C.blue);
 }
 
-export function createCell(canvas, { mode = "play", onStep, onSelect } = {}) {
+export function createCell(canvas, { mode = "play", speed = 1, onStep, onSelect } = {}) {
   const play = mode === "play";
   let selected = null;
   let hover = null;
@@ -171,11 +176,11 @@ export function createCell(canvas, { mode = "play", onStep, onSelect } = {}) {
   let hits = [];
 
   const st = createStage(canvas, { units: 21, cx: 0.5, cy: 0.555, draw });
-  if (reduced) st.time = INTRO + 8.9;
+  if (reduced) st.time = INTRO + 8.9 / speed;
 
   function draw(stage, time) {
     const { ctx } = stage;
-    const t = play ? (time < INTRO ? 0 : (time - INTRO) % LOOP) : 0;
+    const t = play ? (time < INTRO ? 0 : ((time - INTRO) * speed) % LOOP) : 0;
     const enter = (i) => easeOut(span(time, 0.1 + i * 0.11, 0.75 + i * 0.11));
     const focus = hover || selected;
     // Parts are queued in drawing order, far to near, and drawn at the end.
@@ -460,6 +465,17 @@ export function createCell(canvas, { mode = "play", onStep, onSelect } = {}) {
   return {
     select(id) {
       selected = id;
+      st.render();
+    },
+    // Jump to a step of the loop.
+    seek(index) {
+      st.time = INTRO + (reduced ? STILL_AT[index] : STEP_AT[index] + 0.02) / speed;
+      st.render();
+    },
+    // Stop or restart the clock. The scene keeps its last frame while it is stopped.
+    setRunning(on) {
+      if (reduced) return;
+      st.running = on;
       st.render();
     },
   };
